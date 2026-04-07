@@ -1,0 +1,13 @@
+FROM python:3.12-slim
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+# Copy backend application files
+COPY backend/ .
+# Copy shared agent modules from project root
+COPY agents.py models.py negotiation_platform.py ./
+RUN mkdir -p /app/data
+ENV DATABASE_URL=sqlite:////app/data/negotiations.db
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
