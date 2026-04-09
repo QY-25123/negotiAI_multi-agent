@@ -42,13 +42,18 @@ export default function Register() {
         </div>
         <h2 className="text-2xl font-bold text-[#e2e8f0] mb-2">Company Registered!</h2>
         <p className="text-[#64748b] mb-6">Your company <strong className="text-[#e2e8f0]">{form.name}</strong> is now on NegotiAI.</p>
-        <div className="flex gap-3 justify-center">
-          <button onClick={() => router.push("/marketplace")} className="px-5 py-2.5 bg-[#6366f1] hover:bg-[#5558e8] text-white rounded-lg text-sm font-medium transition-colors">
-            Browse Marketplace →
+        <div className="flex flex-col gap-3 items-center">
+          {(form.type === "seller" || form.type === "both") && (
+            <button onClick={() => router.push("/marketplace")} className="w-full px-5 py-2.5 bg-[#6366f1] hover:bg-[#5558e8] text-white rounded-lg text-sm font-medium transition-colors">
+              Post Your First Listing →
+            </button>
+          )}
+          <button onClick={() => router.push("/marketplace")} className="w-full px-5 py-2.5 bg-[#13131a] border border-[#2a2a3e] text-[#94a3b8] rounded-lg text-sm font-medium hover:text-[#e2e8f0] transition-colors">
+            Browse Marketplace
           </button>
           <button onClick={() => { setSuccess(false); setForm({ name: "", industry: "", type: "both", description: "", avatar_color: COLORS[0], website: "", contact_email: "" }); }}
-            className="px-5 py-2.5 bg-[#13131a] border border-[#2a2a3e] text-[#94a3b8] rounded-lg text-sm font-medium hover:text-[#e2e8f0] transition-colors">
-            Register Another
+            className="text-xs text-[#64748b] hover:text-[#94a3b8] transition-colors underline">
+            Register Another Company
           </button>
         </div>
       </div>

@@ -6,8 +6,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend application files
 COPY backend/ .
 # Copy shared agent modules from project root
-COPY agents.py models.py negotiation_platform.py ./
+COPY agents.py models.py negotiation_platform.py validators.py ./
 RUN mkdir -p /app/data
+# DATABASE_URL is injected at runtime via docker-compose environment.
+# Defaults to SQLite if not set.
 ENV DATABASE_URL=sqlite:////app/data/negotiations.db
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

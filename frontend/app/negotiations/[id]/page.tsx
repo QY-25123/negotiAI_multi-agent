@@ -1,14 +1,14 @@
 "use client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, NegotiationMessage } from "@/lib/api";
 import { formatCurrency, timeAgo, SERVICE_COLORS, ACTION_CONFIG } from "@/lib/utils";
 import { CompanyAvatar } from "@/components/ui/CompanyAvatar";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useReplay } from "@/hooks/useReplay";
-import { useNegotiationStream } from "@/hooks/useNegotiationStream";
-import { CheckCircle2, XCircle, Zap, Clock, Download } from "lucide-react";
+import { useNegotiationStream, PendingTerms } from "@/hooks/useNegotiationStream";
+import { CheckCircle2, XCircle, Zap, Clock, Download, UserCheck, RefreshCw, Loader2, AlertTriangle, X } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 // Thinking indicator component
@@ -102,18 +102,198 @@ function MessageBubble({ msg, sellerName, buyerName, sellerColor, buyerColor }: 
   );
 }
 
+// ── Human-in-the-loop review panel ──────────────────────────────────────────
+
+interface OverrideForm {
+  buyer_max_price: string;
+  buyer_target_price: string;
+  seller_min_price_override: string;
+  max_rounds: string;
+}
+
+function HumanReviewPanel({
+  negotiationId,
+  terms,
+  proposedValue,
+  sellerName,
+  buyerName,
+  buyerConfigJson,
+  onActionComplete,
+}: {
+  negotiationId: string;
+  terms: PendingTerms;
+  proposedValue: number | null;
+  sellerName: string;
+  buyerName: string;
+  buyerConfigJson?: string;
+  onActionComplete: () => void;
+}) {
+  const [showOverride, setShowOverride] = useState(false);
+  const [loading, setLoading] = useState<"approve" | "renegotiate" | null>(null);
+  const [error, setError] = useState("");
+
+  // Pre-fill overrides from original buyer config
+  const originalConfig = (() => {
+    try { return JSON.parse(buyerConfigJson || "{}"); } catch { return {}; }
+  })();
+  const [form, setForm] = useState<OverrideForm>({
+    buyer_max_price: String(originalConfig.max_budget_per_unit || ""),
+    buyer_target_price: String(originalConfig.target_price_per_unit || ""),
+    seller_min_price_override: "",
+    max_rounds: "8",
+  });
+
+  const handleApprove = async () => {
+    setLoading("approve"); setError("");
+    try {
+      await api.negotiations.review(negotiationId, "approve");
+      onActionComplete();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to approve");
+      setLoading(null);
+    }
+  };
+
+  const handleRenegotiate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading("renegotiate"); setError("");
+    const overrides: Record<string, number> = {};
+    if (form.buyer_max_price) overrides.buyer_max_price = parseFloat(form.buyer_max_price);
+    if (form.buyer_target_price) overrides.buyer_target_price = parseFloat(form.buyer_target_price);
+    if (form.seller_min_price_override) overrides.seller_min_price_override = parseFloat(form.seller_min_price_override);
+    if (form.max_rounds) overrides.max_rounds = parseInt(form.max_rounds);
+    try {
+      await api.negotiations.review(negotiationId, "renegotiate", overrides);
+      onActionComplete();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to re-trigger negotiation");
+      setLoading(null);
+    }
+  };
+
+  return (
+    <div className="bg-[#0d1f2e] border border-[#f59e0b]/40 rounded-xl overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-[#f59e0b]/20 flex items-center gap-3 bg-[#f59e0b]/10">
+        <AlertTriangle className="w-5 h-5 text-[#f59e0b] shrink-0" />
+        <div>
+          <h3 className="text-sm font-bold text-[#fbbf24]">Awaiting Your Review</h3>
+          <p className="text-xs text-[#92400e] mt-0.5">AI agents reached a deal — approve to finalise or override constraints and re-negotiate.</p>
+        </div>
+      </div>
+
+      {/* Proposed terms */}
+      <div className="p-5 space-y-2 text-sm">
+        {terms.format && (
+          <div className="flex justify-between"><span className="text-[#94a3b8]">Format</span><span className="text-[#e2e8f0]">{terms.format}</span></div>
+        )}
+        {terms.duration_days && (
+          <div className="flex justify-between"><span className="text-[#94a3b8]">Duration</span><span className="text-[#e2e8f0]">{terms.duration_days} days</span></div>
+        )}
+        {terms.price_per_day && (
+          <div className="flex justify-between"><span className="text-[#94a3b8]">Rate</span><span className="text-[#e2e8f0]">${terms.price_per_day}/day</span></div>
+        )}
+        {terms.start_date && (
+          <div className="flex justify-between"><span className="text-[#94a3b8]">Start date</span><span className="text-[#e2e8f0]">{terms.start_date}</span></div>
+        )}
+        {proposedValue != null && (
+          <div className="flex justify-between pt-2 border-t border-[#f59e0b]/20">
+            <span className="font-semibold text-[#e2e8f0]">Total Value</span>
+            <span className="text-xl font-bold text-[#f59e0b]">{formatCurrency(proposedValue)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      {!showOverride ? (
+        <div className="px-5 pb-5 space-y-2">
+          {error && <p className="text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2">{error}</p>}
+          <button
+            onClick={handleApprove}
+            disabled={loading !== null}
+            className="w-full py-2.5 rounded-lg bg-[#22c55e] hover:bg-[#16a34a] text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {loading === "approve" ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+            Approve & Finalise Contract
+          </button>
+          <button
+            onClick={() => setShowOverride(true)}
+            disabled={loading !== null}
+            className="w-full py-2.5 rounded-lg bg-[#f59e0b]/15 hover:bg-[#f59e0b]/25 text-[#fbbf24] border border-[#f59e0b]/30 text-sm font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Override Constraints & Re-negotiate
+          </button>
+        </div>
+      ) : (
+        <div className="px-5 pb-5">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-semibold text-[#fbbf24]">Override Constraint Boundaries</h4>
+            <button onClick={() => setShowOverride(false)} className="p-1 rounded hover:bg-[#2a2a3e] transition-colors">
+              <X className="w-3.5 h-3.5 text-[#64748b]" />
+            </button>
+          </div>
+          <form onSubmit={handleRenegotiate} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-medium text-[#94a3b8] block mb-1">Buyer max (ceiling) *</label>
+                <input type="number" min="0" step="0.01"
+                  className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-2.5 py-2 text-xs text-[#e2e8f0] focus:outline-none focus:border-[#f59e0b]"
+                  placeholder="e.g. 60" value={form.buyer_max_price}
+                  onChange={e => setForm(f => ({ ...f, buyer_max_price: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-[#94a3b8] block mb-1">Buyer target (opening)</label>
+                <input type="number" min="0" step="0.01"
+                  className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-2.5 py-2 text-xs text-[#e2e8f0] focus:outline-none focus:border-[#f59e0b]"
+                  placeholder="e.g. 45" value={form.buyer_target_price}
+                  onChange={e => setForm(f => ({ ...f, buyer_target_price: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-[#94a3b8] block mb-1">Seller min (floor override)</label>
+                <input type="number" min="0" step="0.01"
+                  className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-2.5 py-2 text-xs text-[#e2e8f0] focus:outline-none focus:border-[#f59e0b]"
+                  placeholder="leave blank = no change" value={form.seller_min_price_override}
+                  onChange={e => setForm(f => ({ ...f, seller_min_price_override: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-[#94a3b8] block mb-1">Max rounds</label>
+                <input type="number" min="1" max="20"
+                  className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-2.5 py-2 text-xs text-[#e2e8f0] focus:outline-none focus:border-[#f59e0b]"
+                  value={form.max_rounds}
+                  onChange={e => setForm(f => ({ ...f, max_rounds: e.target.value }))} />
+              </div>
+            </div>
+            {error && <p className="text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2">{error}</p>}
+            <button type="submit" disabled={loading !== null}
+              className="w-full py-2.5 rounded-lg bg-[#f59e0b] hover:bg-[#d97706] text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+              {loading === "renegotiate" ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              Re-trigger Negotiation
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function NegotiationDetail() {
   const { id } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { data: neg, isLoading } = useQuery({
     queryKey: ["negotiation", id],
     queryFn: () => api.negotiations.get(id),
-    refetchInterval: (query) => query.state.data?.status === "active" ? 10000 : false,
+    refetchInterval: (query) => {
+      const s = query.state.data?.status;
+      return s === "active" || s === "pending_review" ? 10000 : false;
+    },
   });
 
   const isActive = neg?.status === "active";
   const isCompleted = neg?.status === "completed";
+  const isPendingReview = neg?.status === "pending_review";
 
   // Replay for completed negotiations
   const { visible: replayMsgs, thinking: replayThinking } = useReplay(
@@ -122,12 +302,28 @@ export default function NegotiationDetail() {
   );
 
   // SSE for active negotiations
-  const { messages: streamMsgs, thinking: streamThinking } = useNegotiationStream(
+  const { messages: streamMsgs, thinking: streamThinking, pendingTerms: streamPendingTerms, proposedValue: streamProposedValue } = useNegotiationStream(
     id, neg?.messages || [], isActive
   );
 
-  const displayMessages = isActive ? streamMsgs : replayMsgs;
-  const thinkingParty = isActive ? streamThinking : replayThinking;
+  // Resolve pending terms: prefer live SSE, fall back to DB field
+  const activePendingTerms = streamPendingTerms || (
+    isPendingReview && neg?.pending_terms_json
+      ? (() => { try { return JSON.parse(neg.pending_terms_json!); } catch { return null; } })()
+      : null
+  );
+  const activePendingValue = streamProposedValue || (
+    activePendingTerms?.price_per_day && activePendingTerms?.duration_days
+      ? activePendingTerms.price_per_day * activePendingTerms.duration_days
+      : null
+  );
+
+  const handleReviewAction = () => {
+    queryClient.invalidateQueries({ queryKey: ["negotiation", id] });
+  };
+
+  const displayMessages = isActive ? streamMsgs : (isPendingReview ? (neg?.messages || []) : replayMsgs);
+  const thinkingParty = isActive ? streamThinking : (isPendingReview ? null : replayThinking);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -303,6 +499,19 @@ export default function NegotiationDetail() {
             </div>
           )}
 
+          {/* Human-in-the-loop review panel */}
+          {activePendingTerms && (
+            <HumanReviewPanel
+              negotiationId={id}
+              terms={activePendingTerms}
+              proposedValue={activePendingValue}
+              sellerName={neg.seller.name}
+              buyerName={neg.buyer.name}
+              buyerConfigJson={neg.buyer_config_json}
+              onActionComplete={handleReviewAction}
+            />
+          )}
+
           {/* Contract card */}
           {neg.contract && neg.outcome === "agreement" && (
             <div className="bg-[#0d2e1a] border border-[#22c55e]/40 rounded-xl p-5">
@@ -345,11 +554,24 @@ export default function NegotiationDetail() {
           {/* No deal card */}
           {neg.outcome === "no_deal" && (
             <div className="bg-[#1a0d0d] border border-[#ef4444]/30 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-3">
                 <XCircle className="w-5 h-5 text-[#ef4444]" />
                 <h3 className="text-sm font-bold text-[#ef4444]">No Agreement Reached</h3>
               </div>
-              <p className="text-sm text-[#94a3b8]">The parties could not bridge the gap between their positions after {neg.round_count} rounds of negotiation.</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[#64748b]">Rounds used</span>
+                  <span className="text-[#e2e8f0]">{neg.round_count} / {neg.max_rounds}</span>
+                </div>
+                {neg.failure_reason && (
+                  <div className="mt-2 p-3 rounded-lg bg-[#ef4444]/10 border border-[#ef4444]/20">
+                    <p className="text-xs text-[#fca5a5] leading-relaxed">{neg.failure_reason}</p>
+                  </div>
+                )}
+                {!neg.failure_reason && (
+                  <p className="text-[#94a3b8]">The parties could not bridge the gap between their positions.</p>
+                )}
+              </div>
             </div>
           )}
 

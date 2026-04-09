@@ -14,6 +14,7 @@ import anthropic
 
 from models import NegotiationTerm
 from negotiation_platform import NegotiationPlatform
+from validators import validate_seller_terms, validate_buyer_terms
 
 # ---------------------------------------------------------------------------
 # ANSI colour helpers
@@ -36,6 +37,7 @@ class SellerConfig:
     """Constraints and preferences for the seller agent."""
     seller_name: str
     absolute_min_price_per_day: float = 20.0   # never go below this
+    asking_price_per_day: Optional[float] = None  # ideal opening ask; defaults to 20% above min
     preferred_min_duration_days: int = 7        # prefer longer campaigns
     brand_keywords: List[str] = None            # keywords buyer must respect
     max_discount_pct: float = 10.0              # max % discount from listed min
@@ -43,6 +45,8 @@ class SellerConfig:
     def __post_init__(self):
         if self.brand_keywords is None:
             self.brand_keywords = ["family-friendly", "local", "community"]
+        if self.asking_price_per_day is None:
+            self.asking_price_per_day = round(self.absolute_min_price_per_day * 1.20, 2)
 
 
 @dataclass
@@ -51,6 +55,7 @@ class BuyerConfig:
     buyer_name: str
     client_name: str
     max_budget_per_day: float = 50.0
+    target_price_per_day: Optional[float] = None  # desired opening offer; defaults to 70% of max
     preferred_formats: List[str] = None
     min_duration_days: int = 14
     max_duration_days: int = 30
@@ -59,6 +64,8 @@ class BuyerConfig:
     def __post_init__(self):
         if self.preferred_formats is None:
             self.preferred_formats = ["digital_screen"]
+        if self.target_price_per_day is None:
+            self.target_price_per_day = round(self.max_budget_per_day * 0.70, 2)
 
 
 # ---------------------------------------------------------------------------
@@ -76,8 +83,9 @@ class SellerAgent:
 Your goal is to negotiate advertising deals that maximize revenue while maintaining the coffee shop's brand image.
 
 CONSTRAINTS & GUIDELINES:
-- Absolute minimum price: ${config.absolute_min_price_per_day:.2f}/day (NEVER go below this)
-- Maximum discount from listed minimum: {config.max_discount_pct}%
+- Absolute minimum price: ${config.absolute_min_price_per_day:.2f}/day (NEVER go below this — hard floor)
+- Asking / opening price: ${config.asking_price_per_day:.2f}/day (start here on your first proposal or counter)
+- Maximum discount from asking price: {config.max_discount_pct}%
 - Preferred minimum campaign duration: {config.preferred_min_duration_days} days
 - Brand keywords buyers must respect: {', '.join(config.brand_keywords)}
 - Only allow formats that are listed for each specific ad space
@@ -90,8 +98,9 @@ CONSTRAINTS & GUIDELINES:
 Negotiation strategy:
 1. First check the negotiation history to understand the current state
 2. If there is a pending proposal from the buyer, respond to it (accept, reject, or counter)
-3. When countering, move incrementally toward the buyer but protect your minimums
-4. Be concise in your messages – keep them under 3 sentences
+3. Open with your asking price (${config.asking_price_per_day:.2f}/day); only concede toward your floor gradually
+4. When countering, move incrementally toward the buyer but protect your absolute minimum
+5. Be concise in your messages – keep them under 3 sentences
 
 IMPORTANT: When you are done negotiating for this turn, end your response with a brief plain-text summary of what action you took."""
 
@@ -206,6 +215,19 @@ IMPORTANT: When you are done negotiating for this turn, end your response with a
                 message: str = inputs.get("message", "")
                 counter_terms_dict: Optional[Dict] = inputs.get("counter_terms")
 
+                # Validate counter-offer terms before submission
+                if action == "counter" and counter_terms_dict:
+                    available_fmts = []
+                    for sp in self.platform.ad_inventory:
+                        available_fmts.extend(sp.available_formats)
+                    ok, err = validate_seller_terms(
+                        counter_terms_dict,
+                        absolute_min_price=self.config.absolute_min_price_per_day,
+                        available_formats=available_fmts or None,
+                    )
+                    if not ok:
+                        return err
+
                 counter_terms: Optional[NegotiationTerm] = None
                 if counter_terms_dict:
                     counter_terms = NegotiationTerm(
@@ -227,6 +249,16 @@ IMPORTANT: When you are done negotiating for this turn, end your response with a
 
             if name == "make_initial_proposal":
                 td = inputs["terms_dict"]
+                available_fmts = []
+                for sp in self.platform.ad_inventory:
+                    available_fmts.extend(sp.available_formats)
+                ok, err = validate_seller_terms(
+                    td,
+                    absolute_min_price=self.config.absolute_min_price_per_day,
+                    available_formats=available_fmts or None,
+                )
+                if not ok:
+                    return err
                 terms = NegotiationTerm(
                     ad_space_id=td["ad_space_id"],
                     format=td["format"],
@@ -308,12 +340,14 @@ You are negotiating on behalf of your client: {config.client_name}.
 Your goal is to secure the best possible advertising space at the lowest cost within budget.
 
 CONSTRAINTS & GUIDELINES:
-- Maximum budget: ${config.max_budget_per_day:.2f}/day (NEVER exceed this)
+- Target / opening offer: ${config.target_price_per_day:.2f}/day (start here on your first proposal)
+- Maximum budget: ${config.max_budget_per_day:.2f}/day (NEVER exceed this — hard ceiling)
+- Acceptable price range: ${config.target_price_per_day:.2f}–${config.max_budget_per_day:.2f}/day
 - Preferred formats: {', '.join(config.preferred_formats)}
 - Required campaign duration: {config.min_duration_days}–{config.max_duration_days} days
 - Desired start date: {config.desired_start_date}
 - You are professional, data-driven, and willing to negotiate
-- Start with a slightly lower offer than your max budget to leave room to negotiate
+- Open with your target price (${config.target_price_per_day:.2f}/day); only go up toward your ceiling gradually
 - If the seller's counter is within 10% of your max budget, consider accepting
 - If no agreement after several rounds, be willing to accept a reasonable price
 - Always check available spaces and history before making/countering a proposal
@@ -323,8 +357,8 @@ Negotiation strategy:
 1. Check inventory to find suitable spaces (prefer digital_screen format)
 2. Check history to understand where the negotiation stands
 3. If there is a pending proposal from the seller, respond (accept or counter)
-4. If it's your first move, submit an opening proposal
-5. Escalate price incrementally when countering – show good faith
+4. If it's your first move, submit an opening proposal at your target price (${config.target_price_per_day:.2f}/day)
+5. Escalate price incrementally when countering – show good faith but stay within your ceiling
 
 IMPORTANT: When you are done for this turn, end with a plain-text summary of the action you took."""
 
@@ -465,6 +499,14 @@ IMPORTANT: When you are done for this turn, end with a plain-text summary of the
 
             if name == "submit_proposal":
                 td = inputs["terms_dict"]
+                ok, err = validate_buyer_terms(
+                    td,
+                    max_budget_per_day=self.config.max_budget_per_day,
+                    min_duration_days=self.config.min_duration_days,
+                    max_duration_days=self.config.max_duration_days,
+                )
+                if not ok:
+                    return err
                 terms = NegotiationTerm(
                     ad_space_id=td["ad_space_id"],
                     format=td["format"],
@@ -490,6 +532,14 @@ IMPORTANT: When you are done for this turn, end with a plain-text summary of the
 
             if name == "counter_proposal":
                 ctd = inputs["counter_terms_dict"]
+                ok, err = validate_buyer_terms(
+                    ctd,
+                    max_budget_per_day=self.config.max_budget_per_day,
+                    min_duration_days=self.config.min_duration_days,
+                    max_duration_days=self.config.max_duration_days,
+                )
+                if not ok:
+                    return err
                 counter_terms = NegotiationTerm(
                     ad_space_id=ctd["ad_space_id"],
                     format=ctd["format"],

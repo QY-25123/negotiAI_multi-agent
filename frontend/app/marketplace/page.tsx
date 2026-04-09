@@ -1,10 +1,10 @@
 "use client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, ServiceListing } from "@/lib/api";
 import { formatCurrency, SERVICE_COLORS, SERVICE_LABELS } from "@/lib/utils";
 import { CompanyAvatar } from "@/components/ui/CompanyAvatar";
-import { Megaphone, Users, Banknote, MapPin, ArrowRight, X, Loader2 } from "lucide-react";
+import { Megaphone, Users, Banknote, MapPin, ArrowRight, X, Loader2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const SERVICE_ICONS: Record<string, React.ElementType> = { advertising: Megaphone, staffing: Users, sponsorship: Banknote };
@@ -56,7 +56,13 @@ function ListingCard({ listing, onSelect }: { listing: ServiceListing; onSelect:
 function StartModal({ listing, onClose }: { listing: ServiceListing; onClose: () => void }) {
   const { data: companies } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
   const router = useRouter();
-  const [form, setForm] = useState({ buyer_company_id: "", max_budget_per_unit: "", preferred_duration_days: "21", start_date: "2026-04-07" });
+  const [form, setForm] = useState({
+    buyer_company_id: "",
+    target_price_per_unit: "",
+    max_budget_per_unit: "",
+    preferred_duration_days: "21",
+    start_date: "2026-04-07",
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -66,12 +72,16 @@ function StartModal({ listing, onClose }: { listing: ServiceListing; onClose: ()
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.buyer_company_id || !form.max_budget_per_unit) { setError("Please fill all required fields"); return; }
+    const target = form.target_price_per_unit ? parseFloat(form.target_price_per_unit) : undefined;
+    const max = parseFloat(form.max_budget_per_unit);
+    if (target !== undefined && target >= max) { setError("Target price must be lower than max budget"); return; }
     setLoading(true); setError("");
     try {
       const res = await api.negotiations.start({
         listing_id: listing.id,
         buyer_company_id: form.buyer_company_id,
-        max_budget_per_unit: parseFloat(form.max_budget_per_unit),
+        target_price_per_unit: target,
+        max_budget_per_unit: max,
         preferred_duration_days: parseInt(form.preferred_duration_days),
         start_date: form.start_date,
       });
@@ -83,16 +93,26 @@ function StartModal({ listing, onClose }: { listing: ServiceListing; onClose: ()
     }
   };
 
+  // Show seller's price range from listing if available
+  const sellerRange = listing.min_price || listing.max_price
+    ? `Seller range: ${listing.min_price ? `$${listing.min_price}` : "—"} – ${listing.max_price ? `$${listing.max_price}` : "—"}/day`
+    : null;
+
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-[#13131a] border border-[#2a2a3e] rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-lg font-bold text-[#e2e8f0]">Start AI Negotiation</h2>
             <p className="text-xs text-[#64748b] mt-0.5 truncate max-w-[280px]">{listing.title}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#2a2a3e] transition-colors"><X className="w-4 h-4 text-[#64748b]" /></button>
         </div>
+        {sellerRange && (
+          <div className="mb-4 px-3 py-2 rounded-lg bg-[#6366f1]/10 border border-[#6366f1]/20 text-xs text-[#818cf8]">
+            {sellerRange}
+          </div>
+        )}
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Buyer Company *</label>
@@ -102,10 +122,25 @@ function StartModal({ listing, onClose }: { listing: ServiceListing; onClose: ()
               {buyers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
+          {/* Price range — target (opening offer) → max (ceiling) */}
           <div>
-            <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Max Budget (per unit/day) *</label>
-            <input type="number" className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1]"
-              placeholder="e.g. 50" value={form.max_budget_per_unit} onChange={e => setForm(f => ({ ...f, max_budget_per_unit: e.target.value }))} required />
+            <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Your Price Range (per unit/day)</label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <input type="number" min="0" step="0.01"
+                  className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1]"
+                  placeholder="Target price" value={form.target_price_per_unit}
+                  onChange={e => setForm(f => ({ ...f, target_price_per_unit: e.target.value }))} />
+                <p className="text-[10px] text-[#64748b] mt-1">Opening offer</p>
+              </div>
+              <div>
+                <input type="number" min="0" step="0.01"
+                  className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1]"
+                  placeholder="Max budget *" value={form.max_budget_per_unit}
+                  onChange={e => setForm(f => ({ ...f, max_budget_per_unit: e.target.value }))} required />
+                <p className="text-[10px] text-[#64748b] mt-1">Hard ceiling *</p>
+              </div>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -130,9 +165,133 @@ function StartModal({ listing, onClose }: { listing: ServiceListing; onClose: ()
   );
 }
 
+function CreateListingModal({ onClose }: { onClose: () => void }) {
+  const { data: companies } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({
+    company_id: "", service_type: "advertising", title: "",
+    description: "", min_price: "", max_price: "", location: "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+
+  const sellers = (companies || []).filter(c => c.type === "seller" || c.type === "both");
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.company_id || !form.title) { setError("Company and title are required"); return; }
+    setLoading(true); setError("");
+    try {
+      await api.listings.create({
+        company_id: form.company_id,
+        service_type: form.service_type,
+        title: form.title,
+        description: form.description,
+        min_price: form.min_price ? parseFloat(form.min_price) : undefined,
+        max_price: form.max_price ? parseFloat(form.max_price) : undefined,
+        location: form.location || undefined,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["listings"] });
+      setSuccess(true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create listing");
+      setLoading(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+        <div className="bg-[#13131a] border border-[#2a2a3e] rounded-2xl p-8 w-full max-w-sm shadow-2xl text-center" onClick={e => e.stopPropagation()}>
+          <div className="w-14 h-14 rounded-full bg-[#22c55e]/20 flex items-center justify-center mx-auto mb-4">
+            <Megaphone className="w-7 h-7 text-[#22c55e]" />
+          </div>
+          <h2 className="text-lg font-bold text-[#e2e8f0] mb-2">Listing Published!</h2>
+          <p className="text-sm text-[#64748b] mb-6">Your service is now visible in the marketplace.</p>
+          <button onClick={onClose} className="w-full py-2.5 bg-[#6366f1] hover:bg-[#5558e8] text-white rounded-lg text-sm font-medium transition-colors">
+            View Marketplace
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-[#13131a] border border-[#2a2a3e] rounded-2xl p-6 w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-lg font-bold text-[#e2e8f0]">Post a Listing</h2>
+            <p className="text-xs text-[#64748b] mt-0.5">Publish your service to the marketplace</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#2a2a3e] transition-colors"><X className="w-4 h-4 text-[#64748b]" /></button>
+        </div>
+        <form onSubmit={submit} className="space-y-4">
+          <div>
+            <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Your Company (Seller) *</label>
+            <select className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1]"
+              value={form.company_id} onChange={e => setForm(f => ({ ...f, company_id: e.target.value }))} required>
+              <option value="">Select company...</option>
+              {sellers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.industry})</option>)}
+            </select>
+            {sellers.length === 0 && (
+              <p className="text-xs text-[#f59e0b] mt-1">No seller companies found. <a href="/register" className="underline">Register one first.</a></p>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Service Type *</label>
+              <select className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1]"
+                value={form.service_type} onChange={e => setForm(f => ({ ...f, service_type: e.target.value }))}>
+                <option value="advertising">Advertising</option>
+                <option value="staffing">Staffing</option>
+                <option value="sponsorship">Sponsorship</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Location</label>
+              <input className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1]"
+                placeholder="e.g. New York, NY" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Listing Title *</label>
+            <input className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1]"
+              placeholder="e.g. Premium Billboard — Downtown Core" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Description</label>
+            <textarea className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1] resize-none"
+              rows={3} placeholder="Describe what you're offering..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Min Price (per unit/day)</label>
+              <input type="number" min="0" className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1]"
+                placeholder="e.g. 30" value={form.min_price} onChange={e => setForm(f => ({ ...f, min_price: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Max Price (per unit/day)</label>
+              <input type="number" min="0" className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1]"
+                placeholder="e.g. 100" value={form.max_price} onChange={e => setForm(f => ({ ...f, max_price: e.target.value }))} />
+            </div>
+          </div>
+          {error && <p className="text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2">{error}</p>}
+          <button type="submit" disabled={loading}
+            className="w-full py-3 rounded-lg bg-[#6366f1] hover:bg-[#5558e8] text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+            {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Publishing...</> : "Publish Listing →"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function Marketplace() {
   const [filter, setFilter] = useState("all");
   const [selected, setSelected] = useState<ServiceListing | null>(null);
+  const [creating, setCreating] = useState(false);
   const { data: listings, isLoading } = useQuery({
     queryKey: ["listings", filter],
     queryFn: () => api.listings.list(filter === "all" ? undefined : filter),
@@ -140,9 +299,15 @@ export default function Marketplace() {
 
   return (
     <div className="p-8 max-w-7xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-[#e2e8f0]">Marketplace</h1>
-        <p className="text-[#64748b] mt-1">Browse available services and launch AI negotiations</p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-[#e2e8f0]">Marketplace</h1>
+          <p className="text-[#64748b] mt-1">Browse available services and launch AI negotiations</p>
+        </div>
+        <button onClick={() => setCreating(true)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#6366f1] hover:bg-[#5558e8] text-white rounded-lg text-sm font-medium transition-colors">
+          <Plus className="w-4 h-4" /> Post a Listing
+        </button>
       </div>
       {/* Filter tabs */}
       <div className="flex gap-2 mb-6">
@@ -170,6 +335,7 @@ export default function Marketplace() {
         </div>
       )}
       {selected && <StartModal listing={selected} onClose={() => setSelected(null)} />}
+      {creating && <CreateListingModal onClose={() => setCreating(false)} />}
     </div>
   );
 }

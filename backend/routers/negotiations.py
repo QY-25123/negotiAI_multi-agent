@@ -43,12 +43,15 @@ class NegotiationListItem(BaseModel):
     service_type: str
     status: str
     outcome: str
+    failure_reason: Optional[str] = None
+    max_rounds: int = 10
     round_count: int
     final_value: Optional[float]
     created_at: datetime
     completed_at: Optional[datetime]
     seller: CompanyRef
     buyer: CompanyRef
+    pending_terms_json: Optional[str] = None
 
 
 class MessageResponse(BaseModel):
@@ -84,6 +87,8 @@ class NegotiationDetail(BaseModel):
     service_type: str
     status: str
     outcome: str
+    failure_reason: Optional[str] = None
+    max_rounds: int = 10
     round_count: int
     final_value: Optional[float]
     created_at: datetime
@@ -92,20 +97,35 @@ class NegotiationDetail(BaseModel):
     buyer: CompanyRef
     messages: List[MessageResponse]
     contract: Optional[ContractResponse]
+    pending_terms_json: Optional[str] = None
+    buyer_config_json: Optional[str] = None
 
 
 class StartNegotiationRequest(BaseModel):
     listing_id: str
     buyer_company_id: str
-    max_budget_per_unit: float = 50.0
+    target_price_per_unit: Optional[float] = None   # opening offer / desired price
+    max_budget_per_unit: float = 50.0               # hard ceiling — never exceeded
     preferred_duration_days: int = 21
     start_date: str = "2026-04-07"
+    max_rounds: int = 10  # negotiation fails if no deal by this many rounds
 
 
 class StartNegotiationResponse(BaseModel):
     negotiation_id: str
     status: str
     message: str
+
+
+class ReviewRequest(BaseModel):
+    action: str  # "approve" | "renegotiate"
+    overrides: Optional[Dict[str, Any]] = None
+
+
+class ReviewResponse(BaseModel):
+    status: str
+    contract_id: Optional[str] = None
+    negotiation_id: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -122,6 +142,8 @@ def _build_list_item(neg: Negotiation) -> NegotiationListItem:
         service_type=neg.service_type,
         status=neg.status,
         outcome=neg.outcome,
+        failure_reason=neg.failure_reason,
+        max_rounds=neg.max_rounds if neg.max_rounds is not None else 10,
         round_count=neg.round_count,
         final_value=neg.final_value,
         created_at=neg.created_at,
@@ -187,6 +209,8 @@ def get_negotiation(negotiation_id: str, db: Session = Depends(get_db)):
         service_type=neg.service_type,
         status=neg.status,
         outcome=neg.outcome,
+        failure_reason=neg.failure_reason,
+        max_rounds=neg.max_rounds if neg.max_rounds is not None else 10,
         round_count=neg.round_count,
         final_value=neg.final_value,
         created_at=neg.created_at,
@@ -255,6 +279,7 @@ def start_negotiation(
         status="active",
         outcome="in_progress",
         round_count=0,
+        max_rounds=body.max_rounds,
     )
     db.add(neg)
     db.commit()
@@ -264,11 +289,15 @@ def start_negotiation(
 
     buyer_config_overrides = {
         "max_budget_per_unit": body.max_budget_per_unit,
+        "target_price_per_unit": body.target_price_per_unit,
         "preferred_duration_days": body.preferred_duration_days,
         "start_date": body.start_date,
         "buyer_name": buyer_company.name,
         "client_name": buyer_company.name,
     }
+    # Persist buyer config so it can be reused on renegotiation
+    neg.buyer_config_json = json.dumps(buyer_config_overrides)
+    db.commit()
 
     from database import SessionLocal
 
@@ -286,6 +315,76 @@ def start_negotiation(
     )
 
 
+@router.post("/{negotiation_id}/review", response_model=ReviewResponse)
+def review_negotiation(
+    negotiation_id: str,
+    body: ReviewRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Human-in-the-loop review endpoint: approve the deal or override constraints and renegotiate."""
+    neg = db.query(Negotiation).filter(Negotiation.id == negotiation_id).first()
+    if not neg:
+        raise HTTPException(status_code=404, detail="Negotiation not found")
+    if neg.status != "pending_review":
+        raise HTTPException(status_code=400, detail="Negotiation is not awaiting human review")
+
+    if body.action == "approve":
+        terms_dict = json.loads(neg.pending_terms_json or "{}")
+        price = float(terms_dict.get("price_per_day", 0))
+        duration = int(terms_dict.get("duration_days", 1))
+        total_value = price * duration
+
+        contract = Contract(
+            negotiation_id=negotiation_id,
+            seller_company_id=neg.seller_company_id,
+            buyer_company_id=neg.buyer_company_id,
+            listing_title=neg.listing.title,
+            terms_json=neg.pending_terms_json,
+            total_value=total_value,
+        )
+        db.add(contract)
+        neg.status = "completed"
+        neg.outcome = "agreement"
+        neg.final_value = total_value
+        neg.completed_at = datetime.utcnow()
+        neg.pending_terms_json = None
+        db.commit()
+        return ReviewResponse(status="approved", contract_id=contract.id)
+
+    if body.action == "renegotiate":
+        overrides = body.overrides or {}
+
+        # Restore original buyer config and apply overrides on top
+        original_config: Dict[str, Any] = {}
+        if neg.buyer_config_json:
+            try:
+                original_config = json.loads(neg.buyer_config_json)
+            except Exception:
+                pass
+
+        merged_buyer: Dict[str, Any] = {**original_config}
+        if "buyer_max_price" in overrides:
+            merged_buyer["max_budget_per_unit"] = float(overrides["buyer_max_price"])
+        if "buyer_target_price" in overrides:
+            merged_buyer["target_price_per_unit"] = float(overrides["buyer_target_price"])
+
+        # Update negotiation state
+        if "max_rounds" in overrides:
+            neg.max_rounds = int(overrides["max_rounds"])
+        neg.status = "active"
+        neg.outcome = "in_progress"
+        neg.pending_terms_json = None
+        neg.override_constraints_json = json.dumps(overrides)
+        db.commit()
+
+        from database import SessionLocal
+        background_tasks.add_task(run_negotiation, negotiation_id, merged_buyer, SessionLocal)
+        return ReviewResponse(status="renegotiating", negotiation_id=negotiation_id)
+
+    raise HTTPException(status_code=400, detail="action must be 'approve' or 'renegotiate'")
+
+
 @router.get("/{negotiation_id}/stream")
 async def stream_negotiation(negotiation_id: str, db: Session = Depends(get_db)):
     """SSE stream for a negotiation. Replays stored messages if already completed."""
@@ -294,7 +393,7 @@ async def stream_negotiation(negotiation_id: str, db: Session = Depends(get_db))
     if not neg:
         raise HTTPException(status_code=404, detail="Negotiation not found")
 
-    # If negotiation is already complete, replay stored messages with 1s delays
+    # If negotiation is not live, replay stored messages then emit terminal event
     if neg.status != "active":
         async def replay_generator():
             messages = (
@@ -322,17 +421,32 @@ async def stream_negotiation(negotiation_id: str, db: Session = Depends(get_db))
                 yield {"data": json.dumps(event_data)}
                 await asyncio.sleep(1.0)
 
-            contract_id = None
-            if neg.contract:
-                contract_id = neg.contract.id
-
-            yield {
-                "data": json.dumps({
-                    "type": "complete",
-                    "outcome": neg.outcome,
-                    "contract_id": contract_id,
-                })
-            }
+            # Terminal event differs by status
+            if neg.status == "pending_review" and neg.pending_terms_json:
+                try:
+                    pending_terms = json.loads(neg.pending_terms_json)
+                except Exception:
+                    pending_terms = {}
+                price = float(pending_terms.get("price_per_day", 0))
+                duration = int(pending_terms.get("duration_days", 1))
+                yield {
+                    "data": json.dumps({
+                        "type": "pending_review",
+                        "terms": pending_terms,
+                        "proposed_value": round(price * duration, 2),
+                    })
+                }
+            else:
+                contract_id = None
+                if neg.contract:
+                    contract_id = neg.contract.id
+                yield {
+                    "data": json.dumps({
+                        "type": "complete",
+                        "outcome": neg.outcome,
+                        "contract_id": contract_id,
+                    })
+                }
 
         return EventSourceResponse(replay_generator())
 
@@ -345,7 +459,7 @@ async def stream_negotiation(negotiation_id: str, db: Session = Depends(get_db))
             while True:
                 event = await queue.get()
                 yield {"data": json.dumps(event)}
-                if event.get("type") in ("complete", "error"):
+                if event.get("type") in ("complete", "error", "pending_review"):
                     break
         finally:
             _queues.pop(negotiation_id, None)

@@ -578,6 +578,8 @@ def _do_seed(db: Session) -> None:
         title="Saveur Food Festival 2026 — Sponsorship Funding",
         status="completed",
         outcome="no_deal",
+        max_rounds=5,
+        failure_reason="Maximum negotiation rounds (5) reached without agreement. The funding gap was too large to bridge — sponsor requested $8,000 but organiser could not exceed $5,500.",
         round_count=5,
         final_value=None,
         created_at=neg3_created,

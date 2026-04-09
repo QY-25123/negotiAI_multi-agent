@@ -91,16 +91,28 @@ def get_listing(listing_id: str, db: Session = Depends(get_db)):
 
 @router.post("", response_model=ListingResponse, status_code=201)
 def create_listing(body: ListingCreate, db: Session = Depends(get_db)):
+    import json as _json
+
     company = db.query(Company).filter(Company.id == body.company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
+
+    # Merge min/max price into terms_json so agents can read them as constraints
+    try:
+        terms: dict = _json.loads(body.terms_json or "{}")
+    except Exception:
+        terms = {}
+    if body.min_price is not None:
+        terms.setdefault("min_price_per_day", body.min_price)
+    if body.max_price is not None:
+        terms.setdefault("max_price_per_day", body.max_price)
 
     listing = ServiceListing(
         company_id=body.company_id,
         service_type=body.service_type,
         title=body.title,
         description=body.description,
-        terms_json=body.terms_json,
+        terms_json=_json.dumps(terms),
         min_price=body.min_price,
         max_price=body.max_price,
         location=body.location,

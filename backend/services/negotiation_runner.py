@@ -75,7 +75,14 @@ async def run_negotiation(
         # Build platform and agents
         # ------------------------------------------------------------------
         try:
-            seller_config = build_seller_config(seller_company.name, listing.terms_json)
+            override_constraints: Dict[str, Any] = {}
+            if neg.override_constraints_json:
+                try:
+                    override_constraints = json.loads(neg.override_constraints_json)
+                except Exception:
+                    pass
+
+            seller_config = build_seller_config(seller_company.name, listing.terms_json, override_constraints)
             buyer_config = build_buyer_config(buyer_config_overrides)
         except Exception as exc:
             await push(negotiation_id, {"type": "error", "detail": str(exc)})
@@ -85,10 +92,11 @@ async def run_negotiation(
             db.commit()
             return
 
+        # Use per-negotiation max_rounds (set when negotiation was created)
         platform = NegotiationPlatform(
             seller_name=seller_company.name,
             buyer_name=buyer_company.name,
-            max_rounds=MAX_ROUNDS,
+            max_rounds=neg.max_rounds,
         )
 
         ad_space = build_ad_space_from_listing(
@@ -108,9 +116,14 @@ async def run_negotiation(
         # ------------------------------------------------------------------
         # Negotiation loop — buyer goes first, then alternate
         # ------------------------------------------------------------------
+        termination_reason: str = ""
         while True:
-            is_done, _reason = platform.is_negotiation_over()
-            if is_done or turn_number >= MAX_ROUNDS:
+            is_done, term_reason = platform.is_negotiation_over()
+            if is_done:
+                termination_reason = term_reason
+                break
+            if turn_number >= neg.max_rounds * 2:  # safety: turns = 2× proposals
+                termination_reason = f"Turn limit reached ({neg.max_rounds} max rounds)."
                 break
 
             # Determine whose turn it is
@@ -142,50 +155,52 @@ async def run_negotiation(
             )
             db_round_count += len(new_msgs)
 
-            is_done, _reason = platform.is_negotiation_over()
+            is_done, term_reason = platform.is_negotiation_over()
             if is_done:
+                termination_reason = term_reason
                 break
 
         # ------------------------------------------------------------------
         # Determine outcome
         # ------------------------------------------------------------------
-        outcome = "no_deal"
-        final_value: Optional[float] = None
-        contract_id: Optional[str] = None
-
+        accepted_proposal = None
         for p in platform.negotiation_history:
             if p.status == "accepted":
-                outcome = "agreement"
-                final_value = p.terms.price_per_day * p.terms.duration_days
-                contract_id = str(uuid4())
-                contract = Contract(
-                    id=contract_id,
-                    negotiation_id=negotiation_id,
-                    seller_company_id=seller_company.id,
-                    buyer_company_id=buyer_company.id,
-                    listing_title=listing.title,
-                    terms_json=json.dumps(p.terms.to_dict()),
-                    total_value=final_value,
-                )
-                db.add(contract)
+                accepted_proposal = p
                 break
 
-        # Update negotiation record
-        neg.status = "completed"
-        neg.outcome = outcome
-        neg.round_count = db_round_count
-        neg.final_value = final_value
-        neg.completed_at = datetime.utcnow()
-        db.commit()
+        if accepted_proposal is not None:
+            # ── Human-in-the-loop: pause for review before finalising ──────
+            neg.status = "pending_review"
+            neg.outcome = "pending_review"
+            neg.round_count = db_round_count
+            neg.pending_terms_json = json.dumps(accepted_proposal.terms.to_dict())
+            db.commit()
 
-        await push(
-            negotiation_id,
-            {
-                "type": "complete",
-                "outcome": outcome,
-                "contract_id": contract_id,
-            },
-        )
+            await push(
+                negotiation_id,
+                {
+                    "type": "pending_review",
+                    "terms": accepted_proposal.terms.to_dict(),
+                    "proposed_value": round(
+                        accepted_proposal.terms.price_per_day * accepted_proposal.terms.duration_days, 2
+                    ),
+                },
+            )
+        else:
+            # No agreement — terminate immediately
+            neg.status = "completed"
+            neg.outcome = "no_deal"
+            neg.round_count = db_round_count
+            neg.final_value = None
+            neg.completed_at = datetime.utcnow()
+            neg.failure_reason = termination_reason or "No agreement reached."
+            db.commit()
+
+            await push(
+                negotiation_id,
+                {"type": "complete", "outcome": "no_deal", "contract_id": None},
+            )
 
     except Exception as exc:
         try:

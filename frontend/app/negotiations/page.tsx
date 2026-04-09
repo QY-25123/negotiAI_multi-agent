@@ -64,7 +64,7 @@ export default function Negotiations() {
                       {neg.status === "active" && <span className="flex items-center gap-1 text-xs text-[#f59e0b]"><span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b] animate-pulse" />Live</span>}
                     </div>
                     <p className="text-sm font-semibold text-[#e2e8f0] group-hover:text-white truncate">{neg.title}</p>
-                    <p className="text-xs text-[#64748b] mt-0.5">{neg.seller.name} → {neg.buyer.name} · {neg.round_count} rounds · {timeAgo(neg.created_at)}</p>
+                    <p className="text-xs text-[#64748b] mt-0.5">{neg.seller.name} → {neg.buyer.name} · {neg.round_count}/{neg.max_rounds} rounds · {timeAgo(neg.created_at)}</p>
                   </div>
                   {/* Right side */}
                   <div className="flex items-center gap-3 shrink-0">

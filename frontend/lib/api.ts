@@ -27,12 +27,16 @@ export interface Contract {
 
 export interface Negotiation {
   id: string; title: string; service_type: string;
-  status: string; outcome: string; round_count: number;
+  status: string; outcome: string;
+  failure_reason?: string; max_rounds: number;
+  round_count: number;
   final_value?: number; created_at: string; completed_at?: string;
   seller: { id: string; name: string; avatar_color: string; logo_initials: string };
   buyer: { id: string; name: string; avatar_color: string; logo_initials: string };
   messages?: NegotiationMessage[];
   contract?: Contract;
+  pending_terms_json?: string;
+  buyer_config_json?: string;
 }
 
 export interface Stats {
@@ -72,6 +76,10 @@ export const api = {
       return apiFetch<ServiceListing[]>(`/api/v1/listings${qs}`);
     },
     get: (id: string) => apiFetch<ServiceListing>(`/api/v1/listings/${id}`),
+    create: (data: {
+      company_id: string; service_type: string; title: string;
+      description?: string; min_price?: number; max_price?: number; location?: string;
+    }) => apiFetch<ServiceListing>("/api/v1/listings", { method: "POST", body: JSON.stringify(data) }),
   },
   negotiations: {
     list: (params?: { status?: string; service_type?: string }) => {
@@ -79,8 +87,13 @@ export const api = {
       return apiFetch<Negotiation[]>(`/api/v1/negotiations${qs}`);
     },
     get: (id: string) => apiFetch<Negotiation>(`/api/v1/negotiations/${id}`),
-    start: (data: { listing_id: string; buyer_company_id: string; max_budget_per_unit: number; preferred_duration_days: number; start_date: string }) =>
+    start: (data: { listing_id: string; buyer_company_id: string; target_price_per_unit?: number; max_budget_per_unit: number; preferred_duration_days: number; start_date: string }) =>
       apiFetch<{ negotiation_id: string }>("/api/v1/negotiations", { method: "POST", body: JSON.stringify(data) }),
+    review: (negotiationId: string, action: "approve" | "renegotiate", overrides?: Record<string, number>) =>
+      apiFetch<{ status: string; contract_id?: string; negotiation_id?: string }>(
+        `/api/v1/negotiations/${negotiationId}/review`,
+        { method: "POST", body: JSON.stringify({ action, overrides }) }
+      ),
   },
   stats: {
     get: () => apiFetch<Stats>("/api/v1/stats"),

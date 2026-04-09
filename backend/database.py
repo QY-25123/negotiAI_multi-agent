@@ -7,6 +7,7 @@ import os
 from contextlib import contextmanager
 from datetime import datetime
 from typing import List, Optional
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from sqlalchemy import (
@@ -18,6 +19,7 @@ from sqlalchemy import (
     Text,
     create_engine,
 )
+from sqlalchemy.engine import URL as SAUrl
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -27,13 +29,44 @@ from sqlalchemy.orm import (
     sessionmaker,
 )
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./negotiations.db")
 
-connect_kwargs = {}
-if DATABASE_URL.startswith("sqlite"):
-    connect_kwargs["check_same_thread"] = False
+def _build_engine():
+    raw = os.environ.get("DATABASE_URL", "sqlite:///./negotiations.db")
 
-engine = create_engine(DATABASE_URL, connect_args=connect_kwargs)
+    # SQLite — simple path, no pool needed
+    if raw.startswith("sqlite"):
+        return create_engine(raw, connect_args={"check_same_thread": False})
+
+    # PostgreSQL — normalise the scheme first (Supabase ships "postgres://")
+    if raw.startswith("postgres://"):
+        raw = raw.replace("postgres://", "postgresql://", 1)
+
+    # Parse with Python's urlparse which correctly handles "@" inside passwords
+    # by splitting on the LAST "@" (rpartition behaviour).
+    parsed = urlparse(raw)
+
+    # Reconstruct via SQLAlchemy URL.create() so special characters in the
+    # password (e.g. "@", "#", "%") are properly encoded — this avoids the
+    # "could not translate host name" crash when passwords contain "@".
+    sa_url = SAUrl.create(
+        drivername="postgresql+psycopg2",
+        username=parsed.username,
+        password=parsed.password,   # plain string; SQLAlchemy encodes it
+        host=parsed.hostname,
+        port=parsed.port,
+        database=parsed.path.lstrip("/"),
+    )
+
+    return create_engine(
+        sa_url,
+        pool_size=5,
+        max_overflow=10,
+        pool_pre_ping=True,   # drop stale connections automatically
+        pool_recycle=300,     # recycle every 5 min (avoids Supabase idle timeout)
+    )
+
+
+engine = _build_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -101,12 +134,18 @@ class Negotiation(Base):
     listing_id: Mapped[str] = mapped_column(String, ForeignKey("service_listings.id"), nullable=False)
     service_type: Mapped[str] = mapped_column(String, nullable=False)
     title: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[str] = mapped_column(String, default="active")  # "active", "completed", "failed"
-    outcome: Mapped[str] = mapped_column(String, default="in_progress")  # "agreement", "no_deal", "in_progress"
+    status: Mapped[str] = mapped_column(String, default="active")  # "active", "pending_review", "completed", "failed"
+    outcome: Mapped[str] = mapped_column(String, default="in_progress")  # "agreement", "no_deal", "pending_review", "in_progress"
+    failure_reason: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # why no deal was reached
+    max_rounds: Mapped[int] = mapped_column(Integer, default=10)  # configurable limit per negotiation
     round_count: Mapped[int] = mapped_column(Integer, default=0)
     final_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    # Human-in-the-loop fields
+    buyer_config_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)          # original buyer constraints
+    pending_terms_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)         # agreed terms awaiting review
+    override_constraints_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # human-supplied overrides
 
     # Relationships
     seller_company: Mapped["Company"] = relationship(
@@ -190,3 +229,28 @@ def get_session():
 def create_tables():
     """Create all tables (idempotent)."""
     Base.metadata.create_all(bind=engine)
+
+
+def migrate_db():
+    """Add any missing columns for new features (idempotent, SQLite + PostgreSQL safe)."""
+    from sqlalchemy import inspect as sa_inspect, text
+
+    try:
+        inspector = sa_inspect(engine)
+        existing = {c["name"] for c in inspector.get_columns("negotiations")}
+    except Exception:
+        return  # Table doesn't exist yet; create_tables() will build it fresh
+
+    new_columns = {
+        "buyer_config_json": "TEXT",
+        "pending_terms_json": "TEXT",
+        "override_constraints_json": "TEXT",
+    }
+    with engine.connect() as conn:
+        for col, col_type in new_columns.items():
+            if col not in existing:
+                try:
+                    conn.execute(text(f"ALTER TABLE negotiations ADD COLUMN {col} {col_type}"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()  # column already exists in concurrent scenario

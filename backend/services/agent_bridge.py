@@ -55,7 +55,7 @@ def build_ad_space_from_listing(listing_id: str, listing_title: str, listing_loc
     )
 
 
-def build_seller_config(seller_name: str, listing_terms_json_str: str) -> SellerConfig:
+def build_seller_config(seller_name: str, listing_terms_json_str: str, overrides: Optional[Dict[str, Any]] = None) -> SellerConfig:
     """Build a SellerConfig from a ServiceListing's terms_json."""
     _require_api_key()
     try:
@@ -66,9 +66,19 @@ def build_seller_config(seller_name: str, listing_terms_json_str: str) -> Seller
     absolute_min_price_per_day = float(terms.get("min_price_per_day", 20.0))
     preferred_min_duration_days = int(terms.get("min_duration_days", 7))
 
+    # asking_price = max_price_per_day from listing, or None (agent defaults to 120% of min)
+    raw_asking = terms.get("max_price_per_day")
+    asking_price_per_day = float(raw_asking) if raw_asking is not None else None
+
+    # Human override: allow lowering the seller's floor for a renegotiation
+    if overrides and "seller_min_price_override" in overrides:
+        absolute_min_price_per_day = float(overrides["seller_min_price_override"])
+        asking_price_per_day = None  # reset so it recalculates from new floor
+
     return SellerConfig(
         seller_name=seller_name,
         absolute_min_price_per_day=absolute_min_price_per_day,
+        asking_price_per_day=asking_price_per_day,
         preferred_min_duration_days=preferred_min_duration_days,
         brand_keywords=["family-friendly", "local", "community"],
         max_discount_pct=10.0,
@@ -78,10 +88,17 @@ def build_seller_config(seller_name: str, listing_terms_json_str: str) -> Seller
 def build_buyer_config(overrides: Dict[str, Any]) -> BuyerConfig:
     """Build a BuyerConfig from caller-supplied override dict."""
     _require_api_key()
+    max_budget = float(overrides.get("max_budget_per_unit", 50.0))
+
+    # target_price = buyer's desired opening offer; None lets agent default to 70% of max
+    raw_target = overrides.get("target_price_per_unit")
+    target_price_per_day = float(raw_target) if raw_target is not None else None
+
     return BuyerConfig(
         buyer_name=overrides.get("buyer_name", "Buyer Agency"),
         client_name=overrides.get("client_name", "Client"),
-        max_budget_per_day=float(overrides.get("max_budget_per_unit", 50.0)),
+        max_budget_per_day=max_budget,
+        target_price_per_day=target_price_per_day,
         preferred_formats=overrides.get("preferred_formats", ["digital_screen"]),
         min_duration_days=int(overrides.get("min_duration_days", 14)),
         max_duration_days=int(overrides.get("preferred_duration_days", 30)),

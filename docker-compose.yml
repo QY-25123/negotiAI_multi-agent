@@ -8,7 +8,9 @@ services:
     volumes:
       - db_data:/app/data
     environment:
-      - DATABASE_URL=sqlite:////app/data/negotiations.db
+      # Set DATABASE_URL in .env to a Supabase PostgreSQL connection string.
+      # Falls back to local SQLite inside the container when not set.
+      - DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/negotiations.db}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
