@@ -1,4 +1,36 @@
+# Environment
 .env
+.env.local
+.env.*.local
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Node
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Docker volumes / local data
+backend/data/
+
+# macOS
+.DS_Store
+
+# Editors
 .vscode/
+.idea/
+*.swp
+
+# Postman (auto-managed, not source-controlled)
+.postman/
+postman/

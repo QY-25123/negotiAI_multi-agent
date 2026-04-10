@@ -8,15 +8,11 @@ the per-negotiation asyncio.Queue managed in routers/negotiations.py.
 
 import asyncio
 import json
-import os
-import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-# Allow importing from parent directory (agents.py, negotiation_platform.py, models.py)
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from agents import BuyerAgent, SellerAgent  # noqa: E402
 from negotiation_platform import NegotiationPlatform  # noqa: E402

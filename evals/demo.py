@@ -2,7 +2,8 @@
 Demo: The Daily Grind Café vs BrightReach Media – AI-powered ad space negotiation.
 
 Run:
-    ANTHROPIC_API_KEY=<your_key> python main.py
+    cd evals
+    ANTHROPIC_API_KEY=<your_key> python demo.py
 """
 
 import os
@@ -10,9 +11,15 @@ import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Load .env file if present
+# Path setup: agent modules live in backend/
 # ---------------------------------------------------------------------------
-_env_file = Path(__file__).parent / ".env"
+_BACKEND_DIR = Path(__file__).parent.parent / "backend"
+sys.path.insert(0, str(_BACKEND_DIR))
+
+# ---------------------------------------------------------------------------
+# Load .env file from project root if present
+# ---------------------------------------------------------------------------
+_env_file = Path(__file__).parent.parent / ".env"
 if _env_file.exists():
     for line in _env_file.read_text().splitlines():
         line = line.strip()

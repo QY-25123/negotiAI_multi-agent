@@ -1,20 +1,14 @@
 """
 agent_bridge.py — Builds AdSpace objects and SellerConfig/BuyerConfig from DB data.
-Bridges the FastAPI backend to the agent layer in the parent directory.
 """
 
 import json
 import os
-import sys
 from typing import Any, Dict, Optional
 
-# Allow importing from parent directory (agents.py, negotiation_platform.py, models.py)
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-
-from fastapi import HTTPException  # noqa: E402 (after sys.path manipulation)
-
-from agents import BuyerConfig, SellerConfig  # noqa: E402
-from models import AdSpace  # noqa: E402
+from fastapi import HTTPException
+from agents import BuyerConfig, SellerConfig
+from models import AdSpace
 
 
 def _require_api_key() -> str:

@@ -36,8 +36,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 
 # ── Path setup ────────────────────────────────────────────────────────────────
-_ROOT = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, _ROOT)
+_EVALS_DIR = os.path.dirname(os.path.abspath(__file__))
+_BACKEND_DIR = os.path.join(_EVALS_DIR, "..", "backend")
+sys.path.insert(0, _BACKEND_DIR)
 
 import anthropic
 from agents import BuyerAgent, BuyerConfig, SellerAgent, SellerConfig
@@ -51,7 +52,7 @@ N_FEASIBLE = 30
 N_INFEASIBLE = 20
 DEFAULT_MODEL = "claude-sonnet-4-6"
 DEFAULT_MAX_ROUNDS = 6
-OUTPUT_DIR = os.path.join(_ROOT, "eval_results")
+OUTPUT_DIR = os.path.join(_EVALS_DIR, "results")
 
 AD_LOCATIONS = [
     "Downtown Core", "North End", "Financial District", "Midtown West",
