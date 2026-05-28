@@ -7,3 +7,5 @@ python-dotenv==1.0.1
 anthropic
 reportlab==4.2.5
 psycopg2-binary==2.9.10
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.1

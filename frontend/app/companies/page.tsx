@@ -39,13 +39,13 @@ export default function Companies() {
                 <div className="flex items-start gap-3 mb-3">
                   <CompanyAvatar name={co.name} initials={co.logo_initials} color={co.avatar_color} size="lg" />
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-base font-semibold text-[#e2e8f0] group-hover:text-white truncate">{co.name}</h3>
-                    <p className="text-xs text-[#64748b] mt-0.5">{co.industry}</p>
+                    <h3 className="text-base font-semibold text-white truncate">{co.name}</h3>
+                    <p className="text-xs text-[#94a3b8] mt-0.5">{co.industry}</p>
                     <span className="inline-block text-xs font-medium px-2 py-0.5 rounded-full mt-1.5"
                       style={{ color: tc.color, backgroundColor: tc.bg }}>{tc.label}</span>
                   </div>
                 </div>
-                <p className="text-xs text-[#64748b] line-clamp-2 mb-4">{co.description}</p>
+                <p className="text-xs text-[#94a3b8] line-clamp-2 mb-4">{co.description}</p>
                 <div className="flex items-center justify-between">
                   <div className="flex gap-3 text-xs text-[#64748b]">
                     <span>{co.listing_count ?? 0} listings</span>

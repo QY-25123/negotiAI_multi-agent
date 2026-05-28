@@ -1,5 +1,8 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+let _token: string | null = null;
+export function setAuthToken(token: string | null) { _token = token; }
+
 export interface Company {
   id: string; name: string; type: string; industry: string;
   description: string; avatar_color: string; logo_initials: string;
@@ -39,6 +42,20 @@ export interface Negotiation {
   buyer_config_json?: string;
 }
 
+export interface AuthCompany {
+  id: string; name: string; type: string; industry: string;
+  avatar_color: string; logo_initials: string;
+}
+
+export interface AuthUser { id: string; email: string; }
+
+export interface AuthResponse {
+  access_token: string; token_type: string;
+  user: AuthUser; company: AuthCompany;
+}
+
+export interface MeResponse { user: AuthUser; company: AuthCompany; }
+
 export interface Stats {
   total_companies: number; total_listings: number;
   total_negotiations: number; completed_negotiations: number;
@@ -50,10 +67,12 @@ export interface ActivityItem {
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const baseHeaders: Record<string, string> = { "Content-Type": "application/json" };
+  if (_token) baseHeaders["Authorization"] = `Bearer ${_token}`;
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
     ...options,
+    headers: { ...baseHeaders, ...(options?.headers as Record<string, string> ?? {}) },
+    cache: "no-store",
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -64,6 +83,17 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   apiBase: API_BASE,
+  auth: {
+    register: (data: {
+      email: string; password: string; company_name: string;
+      company_type: string; industry: string; description?: string;
+      avatar_color?: string; website?: string;
+    }) => apiFetch<AuthResponse>("/api/v1/auth/register", { method: "POST", body: JSON.stringify(data) }),
+    login: (data: { email: string; password: string }) =>
+      apiFetch<AuthResponse>("/api/v1/auth/login", { method: "POST", body: JSON.stringify(data) }),
+    me: () => apiFetch<MeResponse>("/api/v1/auth/me"),
+    demo: () => apiFetch<AuthResponse>("/api/v1/auth/demo", { method: "POST" }),
+  },
   companies: {
     list: () => apiFetch<Company[]>("/api/v1/companies"),
     get: (id: string) => apiFetch<Company>(`/api/v1/companies/${id}`),

@@ -4,31 +4,43 @@ import { useState } from "react";
 import { api, ServiceListing } from "@/lib/api";
 import { formatCurrency, SERVICE_COLORS, SERVICE_LABELS } from "@/lib/utils";
 import { CompanyAvatar } from "@/components/ui/CompanyAvatar";
-import { Megaphone, Users, Banknote, MapPin, ArrowRight, X, Loader2, Plus } from "lucide-react";
+import { Megaphone, Users, Banknote, MapPin, ArrowRight, X, Loader2, Plus, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 const SERVICE_ICONS: Record<string, React.ElementType> = { advertising: Megaphone, staffing: Users, sponsorship: Banknote };
 const FILTERS = ["all", "advertising", "staffing", "sponsorship"];
 
-function ListingCard({ listing, onSelect }: { listing: ServiceListing; onSelect: () => void }) {
+function ListingCard({ listing, onSelect, canNegotiate, isOwn }: {
+  listing: ServiceListing; onSelect: () => void; canNegotiate: boolean; isOwn: boolean;
+}) {
   const Icon = SERVICE_ICONS[listing.service_type] || Megaphone;
   const color = SERVICE_COLORS[listing.service_type];
 
   return (
-    <div className="bg-[#13131a] border border-[#1e1e2e] rounded-xl p-5 hover:border-[#2a2a3e] hover:bg-[#1a1a24] transition-all flex flex-col group cursor-pointer" onClick={onSelect}>
+    <div className={`bg-[#13131a] border rounded-xl p-5 transition-all flex flex-col group
+      ${isOwn ? "border-[#6366f1]/40 hover:border-[#6366f1]/70" : "border-[#1e1e2e] hover:border-[#2a2a3e] hover:bg-[#1a1a24]"}
+      ${canNegotiate ? "cursor-pointer" : ""}`}
+      onClick={canNegotiate ? onSelect : undefined}
+    >
       <div className="flex items-start justify-between mb-3">
         <div className="p-2 rounded-lg" style={{ backgroundColor: `${color}20` }}>
           <Icon className="w-5 h-5" style={{ color }} />
         </div>
-        {listing.company && (
-          <CompanyAvatar name={listing.company.name} initials={listing.company.logo_initials} color={listing.company.avatar_color} size="sm" />
-        )}
+        <div className="flex items-center gap-1.5">
+          {isOwn && (
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#6366f1]/20 text-[#818cf8]">Yours</span>
+          )}
+          {listing.company && (
+            <CompanyAvatar name={listing.company.name} initials={listing.company.logo_initials} color={listing.company.avatar_color} size="sm" />
+          )}
+        </div>
       </div>
       <span className="text-xs font-medium mb-2" style={{ color }}>
         {SERVICE_LABELS[listing.service_type]}
       </span>
-      <h3 className="text-base font-semibold text-[#e2e8f0] group-hover:text-white mb-1 line-clamp-2">{listing.title}</h3>
-      <p className="text-xs text-[#64748b] mb-3 line-clamp-2">{listing.description}</p>
+      <h3 className="text-base font-semibold text-white mb-1 line-clamp-2">{listing.title}</h3>
+      <p className="text-xs text-[#94a3b8] mb-3 line-clamp-2">{listing.description}</p>
       {listing.company && <p className="text-xs text-[#94a3b8] mb-3">{listing.company.name} · {listing.company.industry}</p>}
       <div className="mt-auto space-y-2">
         {(listing.min_price || listing.max_price) && (
@@ -45,19 +57,29 @@ function ListingCard({ listing, onSelect }: { listing: ServiceListing; onSelect:
             <MapPin className="w-3 h-3" /> {listing.location}
           </div>
         )}
-        <button className="w-full mt-2 py-2 rounded-lg text-sm font-medium border border-[#6366f1]/40 text-[#818cf8] hover:bg-[#6366f1]/20 hover:text-white transition-all flex items-center justify-center gap-2">
-          View & Negotiate <ArrowRight className="w-4 h-4" />
-        </button>
+        {canNegotiate ? (
+          <button className="w-full mt-2 py-2 rounded-lg text-sm font-medium border border-[#6366f1]/40 text-[#818cf8] hover:bg-[#6366f1]/20 hover:text-white transition-all flex items-center justify-center gap-2">
+            View & Negotiate <ArrowRight className="w-4 h-4" />
+          </button>
+        ) : isOwn ? (
+          <div className="w-full mt-2 py-2 rounded-lg text-sm font-medium border border-[#6366f1]/20 text-[#64748b] flex items-center justify-center gap-2">
+            Your listing
+          </div>
+        ) : (
+          <div className="w-full mt-2 py-2 rounded-lg text-sm font-medium border border-[#2a2a3e] text-[#64748b] flex items-center justify-center gap-2">
+            <Lock className="w-3.5 h-3.5" /> Sellers cannot negotiate
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 function StartModal({ listing, onClose }: { listing: ServiceListing; onClose: () => void }) {
-  const { data: companies } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
+  const { company: authCompany } = useAuth();
   const router = useRouter();
   const [form, setForm] = useState({
-    buyer_company_id: "",
+    buyer_company_id: authCompany?.id || "",
     target_price_per_unit: "",
     max_budget_per_unit: "",
     preferred_duration_days: "21",
@@ -65,9 +87,6 @@ function StartModal({ listing, onClose }: { listing: ServiceListing; onClose: ()
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // exclude the listing's own company
-  const buyers = (companies || []).filter(c => c.id !== listing.company_id && (c.type === "buyer" || c.type === "both"));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,12 +134,16 @@ function StartModal({ listing, onClose }: { listing: ServiceListing; onClose: ()
         )}
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Buyer Company *</label>
-            <select className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1]"
-              value={form.buyer_company_id} onChange={e => setForm(f => ({ ...f, buyer_company_id: e.target.value }))} required>
-              <option value="">Select company...</option>
-              {buyers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Negotiating as</label>
+            <div className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] flex items-center gap-2">
+              {authCompany && (
+                <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
+                  style={{ backgroundColor: authCompany.avatar_color }}>
+                  {authCompany.logo_initials}
+                </div>
+              )}
+              {authCompany?.name ?? "Your company"}
+            </div>
           </div>
           {/* Price range — target (opening offer) → max (ceiling) */}
           <div>
@@ -166,17 +189,15 @@ function StartModal({ listing, onClose }: { listing: ServiceListing; onClose: ()
 }
 
 function CreateListingModal({ onClose }: { onClose: () => void }) {
-  const { data: companies } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
+  const { company: authCompany } = useAuth();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
-    company_id: "", service_type: "advertising", title: "",
+    company_id: authCompany?.id || "", service_type: "advertising", title: "",
     description: "", min_price: "", max_price: "", location: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-
-  const sellers = (companies || []).filter(c => c.type === "seller" || c.type === "both");
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -229,15 +250,16 @@ function CreateListingModal({ onClose }: { onClose: () => void }) {
         </div>
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Your Company (Seller) *</label>
-            <select className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1]"
-              value={form.company_id} onChange={e => setForm(f => ({ ...f, company_id: e.target.value }))} required>
-              <option value="">Select company...</option>
-              {sellers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.industry})</option>)}
-            </select>
-            {sellers.length === 0 && (
-              <p className="text-xs text-[#f59e0b] mt-1">No seller companies found. <a href="/register" className="underline">Register one first.</a></p>
-            )}
+            <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Posting as</label>
+            <div className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] flex items-center gap-2">
+              {authCompany && (
+                <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
+                  style={{ backgroundColor: authCompany.avatar_color }}>
+                  {authCompany.logo_initials}
+                </div>
+              )}
+              {authCompany?.name ?? "Your company"}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -289,6 +311,7 @@ function CreateListingModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function Marketplace() {
+  const { company } = useAuth();
   const [filter, setFilter] = useState("all");
   const [selected, setSelected] = useState<ServiceListing | null>(null);
   const [creating, setCreating] = useState(false);
@@ -297,17 +320,28 @@ export default function Marketplace() {
     queryFn: () => api.listings.list(filter === "all" ? undefined : filter),
   });
 
+  const isSeller = company?.type === "seller" || company?.type === "both";
+  const isBuyer = company?.type === "buyer" || company?.type === "both";
+
+  const subtitle = isBuyer && !isSeller
+    ? "Browse available services and launch AI negotiations"
+    : isSeller && !isBuyer
+    ? "Manage your listings and attract buyers"
+    : "Browse, post, and negotiate services";
+
   return (
     <div className="p-8 max-w-7xl">
       <div className="mb-8 flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold text-[#e2e8f0]">Marketplace</h1>
-          <p className="text-[#64748b] mt-1">Browse available services and launch AI negotiations</p>
+          <p className="text-[#64748b] mt-1">{subtitle}</p>
         </div>
-        <button onClick={() => setCreating(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#6366f1] hover:bg-[#5558e8] text-white rounded-lg text-sm font-medium transition-colors">
-          <Plus className="w-4 h-4" /> Post a Listing
-        </button>
+        {isSeller && (
+          <button onClick={() => setCreating(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#6366f1] hover:bg-[#5558e8] text-white rounded-lg text-sm font-medium transition-colors">
+            <Plus className="w-4 h-4" /> Post a Listing
+          </button>
+        )}
       </div>
       {/* Filter tabs */}
       <div className="flex gap-2 mb-6">
@@ -330,7 +364,19 @@ export default function Marketplace() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(listings || []).map(l => <ListingCard key={l.id} listing={l} onSelect={() => setSelected(l)} />)}
+          {(listings || []).map(l => {
+            const isOwn = l.company_id === company?.id;
+            const canNegotiate = isBuyer && !isOwn;
+            return (
+              <ListingCard
+                key={l.id}
+                listing={l}
+                onSelect={() => setSelected(l)}
+                canNegotiate={canNegotiate}
+                isOwn={isOwn}
+              />
+            );
+          })}
           {listings?.length === 0 && <p className="col-span-3 text-center text-[#64748b] py-16">No listings found</p>}
         </div>
       )}

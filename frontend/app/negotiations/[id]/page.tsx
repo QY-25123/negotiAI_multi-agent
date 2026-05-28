@@ -178,7 +178,7 @@ function HumanReviewPanel({
         <AlertTriangle className="w-5 h-5 text-[#f59e0b] shrink-0" />
         <div>
           <h3 className="text-sm font-bold text-[#fbbf24]">Awaiting Your Review</h3>
-          <p className="text-xs text-[#92400e] mt-0.5">AI agents reached a deal — approve to finalise or override constraints and re-negotiate.</p>
+          <p className="text-xs text-[#fbbf24] mt-0.5">AI agents reached a deal — approve to finalise or override constraints and re-negotiate.</p>
         </div>
       </div>
 
@@ -488,12 +488,12 @@ export default function NegotiationDetail() {
                   <XAxis dataKey="round" tick={{ fontSize: 10, fill: "#64748b" }} label={{ value: "Round", position: "insideBottom", offset: -2, fontSize: 10, fill: "#64748b" }} />
                   <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={(v: number) => `$${v}`} width={45} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: "#13131a", border: "1px solid #2a2a3e", borderRadius: "8px", fontSize: "12px" }}
+                    contentStyle={{ backgroundColor: "#13131a", border: "1px solid #2a2a3e", borderRadius: "8px", fontSize: "12px", color: "#e2e8f0" }}
                     formatter={(v) => v != null ? [`$${v}`, undefined] : [`$0`, undefined]}
                   />
                   <Line type="monotone" dataKey="seller" stroke={sellerColor} strokeWidth={2} dot={{ fill: sellerColor, r: 4 }} name="Seller" />
                   <Line type="monotone" dataKey="buyer" stroke={buyerColor} strokeWidth={2} dot={{ fill: buyerColor, r: 4 }} name="Buyer" />
-                  <Legend wrapperStyle={{ fontSize: "11px" }} />
+                  <Legend wrapperStyle={{ fontSize: "11px", color: "#94a3b8" }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

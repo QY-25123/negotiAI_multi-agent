@@ -1,18 +1,32 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { LayoutDashboard, Store, MessageSquare, Building2, UserPlus, Zap } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { LayoutDashboard, Store, MessageSquare, Building2, Zap, LogOut } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/negotiations", label: "Negotiations", icon: MessageSquare },
   { href: "/companies", label: "Companies", icon: Building2 },
-  { href: "/register", label: "Register", icon: UserPlus },
 ];
+
+const ROLE_LABEL: Record<string, string> = {
+  seller: "Seller",
+  buyer: "Buyer",
+  both: "Seller & Buyer",
+};
 
 export function Sidebar() {
   const path = usePathname();
+  const router = useRouter();
+  const { company, user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
+
   return (
     <aside className="fixed left-0 top-0 h-full w-[240px] bg-[#0d0d14] border-r border-[#1e1e2e] flex flex-col z-50">
       {/* Logo */}
@@ -47,9 +61,32 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-[#1e1e2e]">
-        <p className="text-[10px] text-[#64748b] text-center">Powered by Claude Opus 4.6</p>
+      {/* User info + logout */}
+      <div className="p-4 border-t border-[#1e1e2e] space-y-3">
+        {company && (
+          <div className="flex items-center gap-2.5 px-1">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+              style={{ backgroundColor: company.avatar_color }}
+            >
+              {company.logo_initials}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-[#e2e8f0] truncate">{company.name}</p>
+              <p className="text-[10px] text-[#64748b]">{ROLE_LABEL[company.type] ?? company.type}</p>
+            </div>
+          </div>
+        )}
+        {user && (
+          <p className="text-[10px] text-[#64748b] px-1 truncate">{user.email}</p>
+        )}
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-[#64748b] hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-all"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          Sign out
+        </button>
       </div>
     </aside>
   );

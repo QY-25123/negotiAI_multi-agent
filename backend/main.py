@@ -16,7 +16,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 from database import create_tables, migrate_db, get_session  # noqa: E402
 from seed_data import seed_if_empty  # noqa: E402
-from routers import companies, contracts, listings, negotiations, stats  # noqa: E402
+from routers import auth, companies, contracts, listings, negotiations, stats  # noqa: E402
 
 log = logging.getLogger("negotiai")
 
@@ -55,17 +55,29 @@ async def lifespan(app: FastAPI):
     _init_db()
     yield
 
+app = FastAPI(
+    title="NegotiAI API",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
-app = FastAPI(title="NegotiAI API", version="1.0.0", lifespan=lifespan)
+# Local dev origins
+_cors_origins = [
+    "http://localhost:3000",
+    "http://frontend:3000",
+]
 
-_cors_origins = ["http://localhost:3000", "http://frontend:3000"]
-_extra = os.environ.get("CORS_ORIGINS", "")  # comma-separated list for production
+# Production origins from env, comma-separated
+_extra = os.environ.get("CORS_ORIGINS", "")
 if _extra:
-    _cors_origins.extend(o.strip() for o in _extra.split(",") if o.strip())
+    _cors_origins.extend(
+        o.strip() for o in _extra.split(",") if o.strip()
+    )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -78,6 +90,7 @@ def health():
 
 
 # Include all routers
+app.include_router(auth.router)
 app.include_router(companies.router)
 app.include_router(contracts.router)
 app.include_router(listings.router)

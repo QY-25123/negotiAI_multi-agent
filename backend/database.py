@@ -79,6 +79,18 @@ class Base(DeclarativeBase):
 # ---------------------------------------------------------------------------
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    email: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    hashed_password: Mapped[str] = mapped_column(String, nullable=False)
+    company_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("companies.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Optional["Company"]] = relationship()
+
+
 class Company(Base):
     __tablename__ = "companies"
 
