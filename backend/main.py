@@ -15,7 +15,6 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 from database import create_tables, migrate_db, get_session  # noqa: E402
-from seed_data import seed_if_empty  # noqa: E402
 from routers import auth, companies, contracts, listings, negotiations, stats  # noqa: E402
 
 log = logging.getLogger("negotiai")
@@ -30,8 +29,6 @@ def _init_db(retries: int = 5, delay: float = 3.0) -> None:
         try:
             create_tables()
             migrate_db()
-            with get_session() as db:
-                seed_if_empty(db)
             return
         except Exception as exc:
             msg = str(exc)

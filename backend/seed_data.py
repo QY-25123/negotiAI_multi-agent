@@ -7,6 +7,7 @@ with realistic pre-completed scenarios so the UI works immediately.
 import json
 from datetime import datetime, timedelta
 
+import bcrypt as _bcrypt
 from sqlalchemy.orm import Session
 
 from database import (
@@ -15,6 +16,7 @@ from database import (
     Negotiation,
     NegotiationMessage,
     ServiceListing,
+    User,
 )
 
 
@@ -119,6 +121,19 @@ def _do_seed(db: Session) -> None:
         },
     ]
 
+    # Seed users: one account per company, password = "demo1234"
+    _seed_users = [
+        ("dailygrind@negotiai.com",  "co-001"),
+        ("brightreach@negotiai.com", "co-002"),
+        ("tempforce@negotiai.com",   "co-003"),
+        ("techventure@negotiai.com", "co-004"),
+        ("localboost@negotiai.com",  "co-005"),
+        ("saveur@negotiai.com",      "co-006"),
+        ("urbanroast@negotiai.com",  "co-007"),
+        ("momentum@negotiai.com",    "co-008"),
+    ]
+    _hashed_pw = _bcrypt.hashpw(b"demo1234", _bcrypt.gensalt()).decode()
+
     for cd in companies_data:
         db.add(Company(
             id=cd["id"],
@@ -128,6 +143,14 @@ def _do_seed(db: Session) -> None:
             description=cd["description"],
             avatar_color=cd["avatar_color"],
             logo_initials=cd["logo_initials"],
+            created_at=base - timedelta(days=30),
+        ))
+
+    for email, company_id in _seed_users:
+        db.add(User(
+            email=email,
+            hashed_password=_hashed_pw,
+            company_id=company_id,
             created_at=base - timedelta(days=30),
         ))
 
