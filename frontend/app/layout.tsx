@@ -8,13 +8,13 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Agora — AI Multi-Agent Marketplace",
-  description: "AI multi-agent marketplace for autonomous B2B negotiation",
+  description: "AI multi-agent marketplace for autonomous B2B deal-making",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.className} bg-[#0a0a0f] text-[#e2e8f0] antialiased`}>
+    <html lang="en">
+      <body className={`${inter.className} bg-[#fff5fb] text-[#1e293b] antialiased`}>
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>

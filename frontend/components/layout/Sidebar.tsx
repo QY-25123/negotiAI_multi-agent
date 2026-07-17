@@ -29,7 +29,7 @@ export function Sidebar() {
   const nav = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/marketplace", label: "Marketplace", icon: Store },
-    { href: "/negotiations", label: "Negotiations", icon: MessageSquare },
+    { href: "/negotiations", label: "Deals", icon: MessageSquare },
     { href: "/companies", label: COMPANIES_LABEL[company?.type ?? "both"] ?? "Companies", icon: Building2 },
   ];
 
@@ -38,7 +38,7 @@ export function Sidebar() {
       {/* Logo */}
       <div className="p-6 border-b border-[#1e1e2e]">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#ec4899] to-[#db2777] flex items-center justify-center">
             <Zap className="w-4 h-4 text-white" />
           </div>
           <span className="text-lg font-bold gradient-text">Agora</span>
@@ -56,11 +56,11 @@ export function Sidebar() {
               href={href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group
                 ${active
-                  ? "bg-[#6366f1]/20 text-[#818cf8] border-l-2 border-[#6366f1]"
+                  ? "bg-[#ec4899]/20 text-[#f472b6] border-l-2 border-[#ec4899]"
                   : "text-[#64748b] hover:text-[#e2e8f0] hover:bg-[#1a1a24]"
                 }`}
             >
-              <Icon className={`w-4 h-4 ${active ? "text-[#6366f1]" : "text-[#64748b] group-hover:text-[#94a3b8]"}`} />
+              <Icon className={`w-4 h-4 ${active ? "text-[#ec4899]" : "text-[#64748b] group-hover:text-[#94a3b8]"}`} />
               {label}
             </Link>
           );
