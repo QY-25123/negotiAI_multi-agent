@@ -7,8 +7,8 @@ import { AppShell } from "@/components/layout/AppShell";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "NegotiAI — Agent-to-Agent Marketplace",
-  description: "AI-powered B2B negotiation platform",
+  title: "Agora — AI Multi-Agent Marketplace",
+  description: "AI multi-agent marketplace for autonomous B2B negotiation",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

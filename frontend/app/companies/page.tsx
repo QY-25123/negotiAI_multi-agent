@@ -24,6 +24,12 @@ export default function Companies() {
   const visibleTypes = myCompany ? getOppositeTypes(myCompany.type) : ["seller", "buyer", "both"];
   const filtered = (companies || []).filter(co => visibleTypes.includes(co.type));
 
+  const title = myCompany?.type === "buyer"
+    ? "Sellers"
+    : myCompany?.type === "seller"
+    ? "Buyers"
+    : "Companies";
+
   const subtitle = myCompany?.type === "buyer"
     ? "Ad space sellers available to negotiate with"
     : myCompany?.type === "seller"
@@ -33,7 +39,7 @@ export default function Companies() {
   return (
     <div className="p-8 max-w-6xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-[#e2e8f0]">Companies</h1>
+        <h1 className="text-3xl font-bold text-[#e2e8f0]">{title}</h1>
         <p className="text-[#64748b] mt-1">{subtitle}</p>
       </div>
 

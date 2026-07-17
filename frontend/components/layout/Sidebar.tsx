@@ -4,12 +4,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, Store, MessageSquare, Building2, Zap, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/marketplace", label: "Marketplace", icon: Store },
-  { href: "/negotiations", label: "Negotiations", icon: MessageSquare },
-  { href: "/companies", label: "Companies", icon: Building2 },
-];
+const COMPANIES_LABEL: Record<string, string> = {
+  buyer: "Sellers",
+  seller: "Buyers",
+  both: "Companies",
+};
 
 const ROLE_LABEL: Record<string, string> = {
   seller: "Seller",
@@ -24,8 +23,15 @@ export function Sidebar() {
 
   const handleLogout = () => {
     logout();
-    router.push("/login");
+    router.push("/");
   };
+
+  const nav = [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/marketplace", label: "Marketplace", icon: Store },
+    { href: "/negotiations", label: "Negotiations", icon: MessageSquare },
+    { href: "/companies", label: COMPANIES_LABEL[company?.type ?? "both"] ?? "Companies", icon: Building2 },
+  ];
 
   return (
     <aside className="fixed left-0 top-0 h-full w-[240px] bg-[#0d0d14] border-r border-[#1e1e2e] flex flex-col z-50">
@@ -35,14 +41,14 @@ export function Sidebar() {
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] flex items-center justify-center">
             <Zap className="w-4 h-4 text-white" />
           </div>
-          <span className="text-lg font-bold gradient-text">NegotiAI</span>
+          <span className="text-lg font-bold gradient-text">Agora</span>
         </div>
-        <p className="text-[11px] text-[#64748b] mt-1">Agent-to-Agent Marketplace</p>
+        <p className="text-[11px] text-[#64748b] mt-1">AI Multi-Agent Marketplace</p>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 p-4 space-y-1">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {nav.map(({ href, label, icon: Icon }) => {
           const active = path === href || path.startsWith(href + "/");
           return (
             <Link

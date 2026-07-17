@@ -58,7 +58,7 @@ export default function Register() {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] flex items-center justify-center">
             <Zap className="w-5 h-5 text-white" />
           </div>
-          <span className="text-2xl font-bold text-[#e2e8f0]">NegotiAI</span>
+          <span className="text-2xl font-bold text-[#e2e8f0]">Agora</span>
         </div>
 
         <div className="bg-[#13131a] border border-[#1e1e2e] rounded-2xl p-6">
