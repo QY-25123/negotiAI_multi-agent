@@ -6,7 +6,7 @@ import { Loader2, Zap } from "lucide-react";
 import Link from "next/link";
 
 const INDUSTRIES = ["Food & Beverage","Marketing & Advertising","HR & Staffing","Events & Conferences","Finance & Investment","Events & Entertainment","Technology","Retail","Healthcare","Other"];
-const COLORS = ["#6366f1","#3b82f6","#10b981","#f59e0b","#8b5cf6","#ef4444","#06b6d4","#f97316"];
+const COLORS = ["#ec4899","#3b82f6","#10b981","#f59e0b","#a855f7","#ef4444","#06b6d4","#f97316"];
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -51,19 +51,19 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#fff5fb] flex items-center justify-center p-4">
       <div className="w-full max-w-xl">
         {/* Logo */}
         <div className="flex items-center gap-2 justify-center mb-8">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#ec4899] to-[#db2777] flex items-center justify-center">
             <Zap className="w-5 h-5 text-white" />
           </div>
-          <span className="text-2xl font-bold text-[#e2e8f0]">Agora</span>
+          <span className="text-2xl font-bold text-[#1e293b]">Agora</span>
         </div>
 
-        <div className="bg-[#13131a] border border-[#1e1e2e] rounded-2xl p-6">
-          <h1 className="text-xl font-bold text-[#e2e8f0] mb-1">Create your account</h1>
-          <p className="text-sm text-[#64748b] mb-6">Register your company and start negotiating</p>
+        <div className="bg-white border border-[#fce7f3] rounded-2xl p-6 shadow-sm">
+          <h1 className="text-xl font-bold text-[#1e293b] mb-1">Create your account</h1>
+          <p className="text-sm text-[#64748b] mb-6">Register your company and start closing deals</p>
 
           <form onSubmit={submit} className="space-y-5">
             {/* Account credentials */}
@@ -71,12 +71,12 @@ export default function Register() {
               <p className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-3">Account</p>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Email *</label>
+                  <label className="text-xs font-medium text-[#475569] block mb-1.5">Email *</label>
                   <input
                     type="email"
                     autoComplete="email"
                     required
-                    className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1] transition-colors"
+                    className="w-full bg-[#fef3f8] border border-[#fce7f3] rounded-lg px-3 py-2.5 text-sm text-[#1e293b] focus:outline-none focus:border-[#ec4899] transition-colors"
                     placeholder="you@company.com"
                     value={form.email}
                     onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
@@ -84,24 +84,24 @@ export default function Register() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Password *</label>
+                    <label className="text-xs font-medium text-[#475569] block mb-1.5">Password *</label>
                     <input
                       type="password"
                       autoComplete="new-password"
                       required
-                      className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1] transition-colors"
+                      className="w-full bg-[#fef3f8] border border-[#fce7f3] rounded-lg px-3 py-2.5 text-sm text-[#1e293b] focus:outline-none focus:border-[#ec4899] transition-colors"
                       placeholder="Min. 8 characters"
                       value={form.password}
                       onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Confirm Password *</label>
+                    <label className="text-xs font-medium text-[#475569] block mb-1.5">Confirm Password *</label>
                     <input
                       type="password"
                       autoComplete="new-password"
                       required
-                      className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1] transition-colors"
+                      className="w-full bg-[#fef3f8] border border-[#fce7f3] rounded-lg px-3 py-2.5 text-sm text-[#1e293b] focus:outline-none focus:border-[#ec4899] transition-colors"
                       placeholder="••••••••"
                       value={form.confirmPassword}
                       onChange={e => setForm(f => ({ ...f, confirmPassword: e.target.value }))}
@@ -111,15 +111,15 @@ export default function Register() {
               </div>
             </div>
 
-            <div className="border-t border-[#1e1e2e] pt-5">
+            <div className="border-t border-[#fce7f3] pt-5">
               <p className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-3">Company</p>
               <div className="space-y-3">
                 {/* Company name */}
                 <div>
-                  <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Company Name *</label>
+                  <label className="text-xs font-medium text-[#475569] block mb-1.5">Company Name *</label>
                   <input
                     required
-                    className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1] transition-colors"
+                    className="w-full bg-[#fef3f8] border border-[#fce7f3] rounded-lg px-3 py-2.5 text-sm text-[#1e293b] focus:outline-none focus:border-[#ec4899] transition-colors"
                     placeholder="e.g. Acme Corp"
                     value={form.company_name}
                     onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))}
@@ -129,10 +129,10 @@ export default function Register() {
                 {/* Industry + Role */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Industry *</label>
+                    <label className="text-xs font-medium text-[#475569] block mb-1.5">Industry *</label>
                     <select
                       required
-                      className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1]"
+                      className="w-full bg-[#fef3f8] border border-[#fce7f3] rounded-lg px-3 py-2.5 text-sm text-[#1e293b] focus:outline-none focus:border-[#ec4899]"
                       value={form.industry}
                       onChange={e => setForm(f => ({ ...f, industry: e.target.value }))}
                     >
@@ -141,13 +141,13 @@ export default function Register() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">I want to</label>
+                    <label className="text-xs font-medium text-[#475569] block mb-1.5">I want to</label>
                     <select
-                      className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1]"
+                      className="w-full bg-[#fef3f8] border border-[#fce7f3] rounded-lg px-3 py-2.5 text-sm text-[#1e293b] focus:outline-none focus:border-[#ec4899]"
                       value={form.company_type}
                       onChange={e => setForm(f => ({ ...f, company_type: e.target.value }))}
                     >
-                      <option value="buyer">Buy / Negotiate</option>
+                      <option value="buyer">Buy / Propose</option>
                       <option value="seller">Sell / Post listings</option>
                       <option value="both">Both</option>
                     </select>
@@ -156,9 +156,9 @@ export default function Register() {
 
                 {/* Description */}
                 <div>
-                  <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Description</label>
+                  <label className="text-xs font-medium text-[#475569] block mb-1.5">Description</label>
                   <textarea
-                    className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1] resize-none"
+                    className="w-full bg-[#fef3f8] border border-[#fce7f3] rounded-lg px-3 py-2.5 text-sm text-[#1e293b] focus:outline-none focus:border-[#ec4899] resize-none"
                     rows={2}
                     placeholder="Brief description of your company..."
                     value={form.description}
@@ -168,11 +168,11 @@ export default function Register() {
 
                 {/* Avatar color */}
                 <div>
-                  <label className="text-xs font-medium text-[#94a3b8] block mb-2">Avatar Color</label>
+                  <label className="text-xs font-medium text-[#475569] block mb-2">Avatar Color</label>
                   <div className="flex gap-2 items-center">
                     {COLORS.map(c => (
                       <button key={c} type="button" onClick={() => setForm(f => ({ ...f, avatar_color: c }))}
-                        className={`w-7 h-7 rounded-full transition-transform ${form.avatar_color === c ? "scale-125 ring-2 ring-white ring-offset-1 ring-offset-[#13131a]" : "hover:scale-110"}`}
+                        className={`w-7 h-7 rounded-full transition-transform ${form.avatar_color === c ? "scale-125 ring-2 ring-[#ec4899] ring-offset-1 ring-offset-white" : "hover:scale-110"}`}
                         style={{ backgroundColor: c }}
                       />
                     ))}
@@ -184,9 +184,9 @@ export default function Register() {
 
                 {/* Website */}
                 <div>
-                  <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Website</label>
+                  <label className="text-xs font-medium text-[#475569] block mb-1.5">Website</label>
                   <input
-                    className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1]"
+                    className="w-full bg-[#fef3f8] border border-[#fce7f3] rounded-lg px-3 py-2.5 text-sm text-[#1e293b] focus:outline-none focus:border-[#ec4899]"
                     placeholder="https://..."
                     value={form.website}
                     onChange={e => setForm(f => ({ ...f, website: e.target.value }))}
@@ -195,12 +195,12 @@ export default function Register() {
               </div>
             </div>
 
-            {error && <p className="text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2">{error}</p>}
+            {error && <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-lg bg-[#6366f1] hover:bg-[#5558e8] text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+              className="w-full py-3 rounded-lg bg-[#ec4899] hover:bg-[#db2777] text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
             >
               {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating account...</> : "Create Account →"}
             </button>
@@ -209,7 +209,7 @@ export default function Register() {
 
         <p className="text-center text-sm text-[#64748b] mt-4">
           Already have an account?{" "}
-          <Link href="/login" className="text-[#818cf8] hover:text-[#6366f1] transition-colors">
+          <Link href="/login" className="text-[#ec4899] hover:text-[#db2777] transition-colors">
             Sign in
           </Link>
         </p>

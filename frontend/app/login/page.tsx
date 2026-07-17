@@ -26,58 +26,58 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-[#fff5fb] flex flex-col items-center justify-center p-4">
 
       {/* Back to home */}
-      <Link href="/" className="flex items-center gap-1.5 text-xs text-[#64748b] hover:text-[#94a3b8] transition-colors mb-8 self-start max-w-sm w-full mx-auto">
+      <Link href="/" className="flex items-center gap-1.5 text-xs text-[#64748b] hover:text-[#ec4899] transition-colors mb-8 self-start max-w-sm w-full mx-auto">
         <ArrowLeft className="w-3.5 h-3.5" /> Back to home
       </Link>
 
       {/* Logo */}
       <Link href="/" className="flex items-center gap-2 mb-8">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] flex items-center justify-center">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#ec4899] to-[#db2777] flex items-center justify-center">
           <Zap className="w-5 h-5 text-white" />
         </div>
         <span className="text-2xl font-bold gradient-text">Agora</span>
       </Link>
 
       {/* Card */}
-      <div className="w-full max-w-sm bg-[#13131a] border border-[#1e1e2e] rounded-2xl p-8">
-        <h1 className="text-xl font-bold text-white mb-1">Welcome back</h1>
+      <div className="w-full max-w-sm bg-white border border-[#fce7f3] rounded-2xl p-8 shadow-sm">
+        <h1 className="text-xl font-bold text-[#1e293b] mb-1">Welcome back</h1>
         <p className="text-sm text-[#64748b] mb-7">Sign in to your account</p>
 
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Email</label>
+            <label className="text-xs font-medium text-[#475569] block mb-1.5">Email</label>
             <input
               type="email"
               autoComplete="email"
               required
-              className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1] transition-colors"
+              className="w-full bg-[#fef3f8] border border-[#fce7f3] rounded-lg px-3 py-2.5 text-sm text-[#1e293b] focus:outline-none focus:border-[#ec4899] transition-colors"
               placeholder="you@company.com"
               value={form.email}
               onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-[#94a3b8] block mb-1.5">Password</label>
+            <label className="text-xs font-medium text-[#475569] block mb-1.5">Password</label>
             <input
               type="password"
               autoComplete="current-password"
               required
-              className="w-full bg-[#0d0d14] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:outline-none focus:border-[#6366f1] transition-colors"
+              className="w-full bg-[#fef3f8] border border-[#fce7f3] rounded-lg px-3 py-2.5 text-sm text-[#1e293b] focus:outline-none focus:border-[#ec4899] transition-colors"
               placeholder="••••••••"
               value={form.password}
               onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
             />
           </div>
 
-          {error && <p className="text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-[#6366f1] hover:bg-[#5558e8] text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+            className="w-full py-2.5 rounded-lg bg-[#ec4899] hover:bg-[#db2777] text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-60"
           >
             {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Signing in…</> : "Sign in →"}
           </button>
@@ -85,7 +85,7 @@ export default function Login() {
 
         <p className="text-center text-xs text-[#64748b] mt-6">
           No account?{" "}
-          <Link href="/register" className="text-[#818cf8] hover:text-[#6366f1] transition-colors">
+          <Link href="/register" className="text-[#ec4899] hover:text-[#db2777] transition-colors">
             Create one
           </Link>
         </p>
