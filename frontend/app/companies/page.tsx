@@ -6,8 +6,8 @@ import { CompanyAvatar } from "@/components/ui/CompanyAvatar";
 import { useAuth } from "@/context/AuthContext";
 
 const TYPE_COLORS: Record<string, { label: string; color: string; bg: string }> = {
-  seller: { label: "Seller", color: "#3b82f6", bg: "rgba(59,130,246,0.12)" },
-  buyer: { label: "Buyer", color: "#10b981", bg: "rgba(16,185,129,0.12)" },
+  seller: { label: "Organizer", color: "#3b82f6", bg: "rgba(59,130,246,0.12)" },
+  buyer: { label: "Sponsor", color: "#10b981", bg: "rgba(16,185,129,0.12)" },
   both: { label: "Both", color: "#a855f7", bg: "rgba(168,85,247,0.12)" },
 };
 
@@ -25,16 +25,16 @@ export default function Companies() {
   const filtered = (companies || []).filter(co => visibleTypes.includes(co.type));
 
   const title = myCompany?.type === "buyer"
-    ? "Sellers"
+    ? "Organizers"
     : myCompany?.type === "seller"
-    ? "Buyers"
-    : "Companies";
+    ? "Sponsors"
+    : "Partners";
 
   const subtitle = myCompany?.type === "buyer"
-    ? "Ad space sellers on the platform"
+    ? "Event organizers looking for sponsorship"
     : myCompany?.type === "seller"
-    ? "Advertising agencies on the platform"
-    : "All registered marketplace participants";
+    ? "Companies looking to sponsor events"
+    : "All registered event marketplace participants";
 
   return (
     <div className="p-8 max-w-6xl">

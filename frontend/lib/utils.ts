@@ -23,7 +23,7 @@ export const SERVICE_COLORS: Record<string, string> = {
   advertising: "#f59e0b", staffing: "#10b981", sponsorship: "#8b5cf6",
 };
 export const SERVICE_LABELS: Record<string, string> = {
-  advertising: "Advertising", staffing: "Staffing", sponsorship: "Sponsorship",
+  advertising: "Event Advertising", staffing: "Event Staffing", sponsorship: "Sponsorship Package",
 };
 export const ACTION_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   proposal: { label: "Initial Proposal", color: "#818cf8", bg: "rgba(99,102,241,0.15)" },

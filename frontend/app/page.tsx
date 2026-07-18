@@ -11,20 +11,20 @@ import {
 const STEPS = [
   {
     number: "01",
-    title: "Seller Posts a Listing",
-    desc: "A seller company registers their ad space — format, pricing floor, duration constraints — on the marketplace.",
+    title: "Organizer Posts a Package",
+    desc: "An event organizer (hackathon, conference, festival) registers their sponsorship packages — tiers, perks, pricing floor, and audience reach.",
     color: "#f59e0b",
   },
   {
     number: "02",
-    title: "Buyer Initiates a Deal",
-    desc: "A buyer sets their budget ceiling and target price, then triggers an AI session against the listing.",
+    title: "Sponsor Initiates a Deal",
+    desc: "A sponsor company sets their budget ceiling and target price, then triggers an AI session against the event package.",
     color: "#ec4899",
   },
   {
     number: "03",
     title: "Agents Propose Autonomously",
-    desc: "Two LLM-powered agents take alternating turns — proposing, countering, and reasoning about the best deal — with no human input.",
+    desc: "Two LLM-powered agents take alternating turns — proposing, countering, and reasoning about the best sponsorship terms — with no human input.",
     color: "#3b82f6",
   },
   {
@@ -36,21 +36,21 @@ const STEPS = [
   {
     number: "05",
     title: "Contract Signed",
-    desc: "Approval instantly generates a signed contract with all agreed terms, downloadable as a PDF.",
+    desc: "Approval instantly generates a signed sponsorship contract with all agreed terms, downloadable as a PDF.",
     color: "#10b981",
   },
 ];
 
 const ARCH = [
   {
-    label: "Seller Agent",
+    label: "Organizer Agent",
     color: "#f59e0b",
     icon: Bot,
     points: [
       "Large Language Model",
       "Adaptive thinking enabled",
-      "Tools: view inventory, respond to proposal",
-      "Protects price floor, max 10% discount",
+      "Tools: view event packages, respond to offer",
+      "Protects funding floor, manages perks",
     ],
   },
   {
@@ -65,14 +65,14 @@ const ARCH = [
     ],
   },
   {
-    label: "Buyer Agent",
+    label: "Sponsor Agent",
     color: "#3b82f6",
     icon: Bot,
     points: [
       "Large Language Model",
       "Adaptive thinking enabled",
-      "Tools: browse listings, submit proposal",
-      "Stays within budget ceiling",
+      "Tools: browse events, submit sponsorship offer",
+      "Stays within sponsorship budget",
     ],
   },
 ];
@@ -136,8 +136,9 @@ export default function Landing() {
         </h1>
 
         <p className="text-lg text-[#475569] max-w-2xl mb-10 leading-relaxed">
-          Agora deploys autonomous AI-powered agents on both sides of a B2B advertising deal.
-          They propose, counter, and close — while you watch in real time and stay in control.
+          Agora deploys autonomous AI-powered agents on both sides of a B2B event sponsorship deal.
+          Sponsors and organizers each get their own agent — they propose, counter, and close
+          while you watch in real time and stay in control.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 mb-6">
@@ -154,7 +155,7 @@ export default function Landing() {
             Sign In
           </Link>
         </div>
-        <p className="text-xs text-[#64748b]">No sign-up needed · Instant access · Live AI deal-making</p>
+        <p className="text-xs text-[#64748b]">No sign-up needed · Instant access · Live AI sponsorship deal-making</p>
       </section>
 
       {/* Architecture */}
@@ -163,8 +164,8 @@ export default function Landing() {
           <p className="text-xs font-semibold text-[#ec4899] uppercase tracking-widest text-center mb-3">System Architecture</p>
           <h2 className="text-3xl font-bold text-[#1e293b] text-center mb-4">Two Agents. One Platform.</h2>
           <p className="text-[#64748b] text-center max-w-xl mx-auto mb-14 text-sm leading-relaxed">
-            Each agent runs an independent tool-use loop powered by LLMs. They share a deal platform
-            as their only communication channel — they never talk directly.
+            The Organizer Agent protects the event's funding floor; the Sponsor Agent stays within budget.
+            Each runs an independent tool-use loop — they share only a deal platform, never talk directly.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
@@ -190,11 +191,11 @@ export default function Landing() {
 
           {/* Flow arrow */}
           <div className="flex items-center justify-center gap-4 mt-6 text-xs text-[#64748b]">
-            <span className="px-3 py-1 rounded-full bg-[#f59e0b]/10 border border-[#f59e0b]/20 text-[#d97706]">Seller Agent</span>
+            <span className="px-3 py-1 rounded-full bg-[#f59e0b]/10 border border-[#f59e0b]/20 text-[#d97706]">Organizer Agent</span>
             <ArrowRight className="w-3.5 h-3.5" />
             <span className="px-3 py-1 rounded-full bg-[#ec4899]/10 border border-[#ec4899]/20 text-[#ec4899]">Platform</span>
             <ArrowRight className="w-3.5 h-3.5" />
-            <span className="px-3 py-1 rounded-full bg-[#3b82f6]/10 border border-[#3b82f6]/20 text-[#3b82f6]">Buyer Agent</span>
+            <span className="px-3 py-1 rounded-full bg-[#3b82f6]/10 border border-[#3b82f6]/20 text-[#3b82f6]">Sponsor Agent</span>
           </div>
         </div>
       </section>
@@ -241,8 +242,8 @@ export default function Landing() {
 
       {/* CTA */}
       <section className="border-t border-[#fce7f3] px-8 py-24 text-center">
-        <h2 className="text-4xl font-extrabold text-[#1e293b] mb-4">See it close a deal live.</h2>
-        <p className="text-[#64748b] mb-10 max-w-md mx-auto text-sm">Jump in as a demo buyer and watch AI agents close a real advertising deal — no account needed.</p>
+        <h2 className="text-4xl font-extrabold text-[#1e293b] mb-4">See it close a sponsorship deal live.</h2>
+        <p className="text-[#64748b] mb-10 max-w-md mx-auto text-sm">Jump in as a demo sponsor and watch AI agents close a real event sponsorship deal — no account needed.</p>
         <button
           onClick={handleDemo}
           disabled={loading}

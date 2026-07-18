@@ -67,7 +67,7 @@ function ListingCard({ listing, onSelect, canNegotiate, isOwn }: {
           </div>
         ) : (
           <div className="w-full mt-2 py-2 rounded-lg text-sm font-medium border border-[#fce7f3] text-[#64748b] flex items-center justify-center gap-2">
-            <Lock className="w-3.5 h-3.5" /> Sellers cannot buy
+            <Lock className="w-3.5 h-3.5" /> Organizers cannot sponsor
           </div>
         )}
       </div>
@@ -133,7 +133,7 @@ function StartModal({ listing, onClose }: { listing: ServiceListing; onClose: ()
         )}
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="text-xs font-medium text-[#475569] block mb-1.5">Buying as</label>
+            <label className="text-xs font-medium text-[#475569] block mb-1.5">Sponsoring as</label>
             <div className="w-full bg-[#fef3f8] border border-[#fce7f3] rounded-lg px-3 py-2.5 text-sm text-[#1e293b] flex items-center gap-2">
               {authCompany && (
                 <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
@@ -322,10 +322,10 @@ export default function Marketplace() {
   const isBuyer = company?.type === "buyer" || company?.type === "both";
 
   const subtitle = isBuyer && !isSeller
-    ? "Browse available services and launch AI sessions"
+    ? "Browse event listings and launch AI sponsorship sessions"
     : isSeller && !isBuyer
-    ? "Manage your listings and attract buyers"
-    : "Browse, post, and close deals";
+    ? "Manage your event packages and attract sponsors"
+    : "Browse events, post packages, and close sponsorship deals";
 
   return (
     <div className="p-8 max-w-7xl">

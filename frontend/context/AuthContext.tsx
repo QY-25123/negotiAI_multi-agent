@@ -14,6 +14,8 @@ interface AuthState {
   }) => Promise<void>;
   tryDemo: () => Promise<void>;
   logout: () => void;
+  refreshCompany: () => Promise<void>;
+  setCompany: (c: AuthCompany) => void;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -64,8 +66,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCompany(null);
   }, []);
 
+  const refreshCompany = useCallback(async () => {
+    const data = await api.auth.me();
+    setCompany(data.company);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, company, isLoading, login, register, tryDemo, logout }}>
+    <AuthContext.Provider value={{ user, company, isLoading, login, register, tryDemo, logout, refreshCompany, setCompany }}>
       {children}
     </AuthContext.Provider>
   );

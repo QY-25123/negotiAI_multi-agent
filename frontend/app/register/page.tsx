@@ -63,7 +63,7 @@ export default function Register() {
 
         <div className="bg-white border border-[#fce7f3] rounded-2xl p-6 shadow-sm">
           <h1 className="text-xl font-bold text-[#1e293b] mb-1">Create your account</h1>
-          <p className="text-sm text-[#64748b] mb-6">Register your company and start closing deals</p>
+          <p className="text-sm text-[#64748b] mb-6">Register to start sponsoring or hosting events</p>
 
           <form onSubmit={submit} className="space-y-5">
             {/* Account credentials */}
@@ -141,14 +141,14 @@ export default function Register() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-[#475569] block mb-1.5">I want to</label>
+                    <label className="text-xs font-medium text-[#475569] block mb-1.5">My role</label>
                     <select
                       className="w-full bg-[#fef3f8] border border-[#fce7f3] rounded-lg px-3 py-2.5 text-sm text-[#1e293b] focus:outline-none focus:border-[#ec4899]"
                       value={form.company_type}
                       onChange={e => setForm(f => ({ ...f, company_type: e.target.value }))}
                     >
-                      <option value="buyer">Buy / Propose</option>
-                      <option value="seller">Sell / Post listings</option>
+                      <option value="buyer">Sponsor — fund events for exposure</option>
+                      <option value="seller">Organizer — host events, seek sponsors</option>
                       <option value="both">Both</option>
                     </select>
                   </div>

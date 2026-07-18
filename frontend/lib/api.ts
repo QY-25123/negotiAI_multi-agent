@@ -99,6 +99,10 @@ export const api = {
     get: (id: string) => apiFetch<Company>(`/api/v1/companies/${id}`),
     create: (data: Partial<Company>) =>
       apiFetch<Company>("/api/v1/companies", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: string, data: {
+      name?: string; type?: string; industry?: string; description?: string;
+      avatar_color?: string; logo_initials?: string; website?: string;
+    }) => apiFetch<Company>(`/api/v1/companies/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   },
   listings: {
     list: (serviceType?: string) => {

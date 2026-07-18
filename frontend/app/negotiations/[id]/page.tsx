@@ -365,7 +365,7 @@ export default function NegotiationDetail() {
           <CompanyAvatar name={neg.seller.name} initials={neg.seller.logo_initials} color={sellerColor} size="md" />
           <div>
             <p className="text-sm font-semibold text-[#1e293b]">{neg.seller.name}</p>
-            <p className="text-xs text-[#64748b]">Seller</p>
+            <p className="text-xs text-[#64748b]">Organizer</p>
           </div>
         </div>
         <div className="flex items-center gap-2 text-[#64748b]">
@@ -375,7 +375,7 @@ export default function NegotiationDetail() {
         <div className="flex items-center gap-3">
           <div className="text-right">
             <p className="text-sm font-semibold text-[#1e293b]">{neg.buyer.name}</p>
-            <p className="text-xs text-[#64748b]">Buyer</p>
+            <p className="text-xs text-[#64748b]">Sponsor</p>
           </div>
           <CompanyAvatar name={neg.buyer.name} initials={neg.buyer.logo_initials} color={buyerColor} size="md" />
         </div>

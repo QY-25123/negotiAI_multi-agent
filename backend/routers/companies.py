@@ -10,7 +10,8 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from database import Company, Negotiation, ServiceListing, get_db
+from database import Company, Negotiation, ServiceListing, User, get_db
+from routers.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/companies", tags=["companies"])
 
@@ -29,6 +30,16 @@ class CompanyCreate(BaseModel):
     logo_initials: str = ""
     website: Optional[str] = None
     contact_email: Optional[str] = None
+
+
+class CompanyUpdate(BaseModel):
+    name: Optional[str] = None
+    type: Optional[str] = None
+    industry: Optional[str] = None
+    description: Optional[str] = None
+    avatar_color: Optional[str] = None
+    logo_initials: Optional[str] = None
+    website: Optional[str] = None
 
 
 class CompanySummary(BaseModel):
@@ -189,6 +200,63 @@ def get_company(company_id: str, db: Session = Depends(get_db)):
             )
             for n in recent_negs
         ],
+    )
+
+
+def _initials(name: str) -> str:
+    parts = name.strip().split()
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    return (parts[0][0] + parts[1][0]).upper()
+
+
+@router.patch("/{company_id}", response_model=CompanySummary)
+def update_company(
+    company_id: str,
+    body: CompanyUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.company_id != company_id:
+        raise HTTPException(status_code=403, detail="Cannot update another company's profile")
+
+    company = db.query(Company).filter(Company.id == company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    if body.name is not None:
+        company.name = body.name
+        if body.logo_initials is None:
+            company.logo_initials = _initials(body.name)
+    if body.logo_initials is not None:
+        company.logo_initials = body.logo_initials
+    if body.type is not None:
+        company.type = body.type
+    if body.industry is not None:
+        company.industry = body.industry
+    if body.description is not None:
+        company.description = body.description
+    if body.avatar_color is not None:
+        company.avatar_color = body.avatar_color
+    if body.website is not None:
+        company.website = body.website
+
+    db.commit()
+    db.refresh(company)
+
+    listing_count = db.query(func.count(ServiceListing.id)).filter(
+        ServiceListing.company_id == company.id
+    ).scalar() or 0
+    neg_count = db.query(func.count(Negotiation.id)).filter(
+        (Negotiation.seller_company_id == company.id) | (Negotiation.buyer_company_id == company.id)
+    ).scalar() or 0
+
+    return CompanySummary(
+        id=company.id, name=company.name, type=company.type,
+        industry=company.industry, description=company.description,
+        avatar_color=company.avatar_color, logo_initials=company.logo_initials,
+        created_at=company.created_at,
+        listing_count=listing_count, negotiation_count=neg_count,
     )
 
 
