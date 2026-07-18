@@ -559,31 +559,49 @@ export default function Marketplace() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(listings || []).map(l => {
-            const isOwn = l.company_id === company?.id;
-            const canNegotiate = !isOwn;
-            return (
-              <ListingCard
-                key={l.id}
-                listing={l}
-                onSelect={() => setDetail(l)}
-                canNegotiate={canNegotiate}
-                isOwn={isOwn}
-              />
-            );
-          })}
+          {(listings || [])
+            .filter(l => {
+              // Always show your own listings.
+              if (l.company_id === company?.id) return true;
+              // "both" companies see everything.
+              if (company?.type === "both") return true;
+              // Organizers see only sponsor listings; sponsors see only organizer listings.
+              if (company?.type === "organizer") return l.company?.type === "sponsor";
+              if (company?.type === "sponsor")   return l.company?.type === "organizer";
+              return true;
+            })
+            .map(l => {
+              const isOwn = l.company_id === company?.id;
+              // canNegotiate: not own, and opposite type (or "both")
+              const oppositeType = company?.type === "both"
+                || l.company?.type !== company?.type;
+              const canNegotiate = !isOwn && oppositeType;
+              return (
+                <ListingCard
+                  key={l.id}
+                  listing={l}
+                  onSelect={() => setDetail(l)}
+                  canNegotiate={canNegotiate}
+                  isOwn={isOwn}
+                />
+              );
+            })}
           {listings?.length === 0 && <p className="col-span-3 text-center text-[#64748b] py-16">No listings found</p>}
         </div>
       )}
-      {detail && (
-        <ListingDetailModal
-          listing={detail}
-          canNegotiate={detail.company_id !== company?.id}
-          isOwn={detail.company_id === company?.id}
-          onClose={() => setDetail(null)}
-          onStartSession={() => { setSelected(detail); setDetail(null); }}
-        />
-      )}
+      {detail && (() => {
+        const isOwn = detail.company_id === company?.id;
+        const canNegotiate = !isOwn && (company?.type === "both" || detail.company?.type !== company?.type);
+        return (
+          <ListingDetailModal
+            listing={detail}
+            canNegotiate={canNegotiate}
+            isOwn={isOwn}
+            onClose={() => setDetail(null)}
+            onStartSession={() => { setSelected(detail); setDetail(null); }}
+          />
+        );
+      })()}
       {selected && <StartModal listing={selected} onClose={() => setSelected(null)} />}
       {creating && <CreateListingModal onClose={() => setCreating(false)} />}
     </div>
