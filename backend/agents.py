@@ -1,24 +1,23 @@
 """
-AI agents for the advertising-space negotiation system.
+AI agents for the event sponsorship deal platform.
 
-Both agents are powered by the Anthropic Python SDK using claude-opus-4-6
-with adaptive thinking and a manual tool-use loop.
+OrganizerAgent represents the event host protecting their funding floor.
+SponsorAgent represents the company seeking sponsorship at the best price.
+
+Both agents use the Anthropic SDK with adaptive thinking and a manual tool-use loop.
 """
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import anthropic
 
 from models import NegotiationTerm
 from negotiation_platform import NegotiationPlatform
-from validators import validate_seller_terms, validate_buyer_terms
+from validators import validate_organizer_terms, validate_sponsor_terms
 
-# ---------------------------------------------------------------------------
-# ANSI colour helpers
-# ---------------------------------------------------------------------------
 BLUE = "\033[94m"
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
@@ -33,95 +32,93 @@ MODEL = "claude-opus-4-6"
 # ---------------------------------------------------------------------------
 
 @dataclass
-class SellerConfig:
-    """Constraints and preferences for the seller agent."""
-    seller_name: str
-    absolute_min_price_per_day: float = 20.0   # never go below this
-    asking_price_per_day: Optional[float] = None  # ideal opening ask; defaults to 20% above min
-    preferred_min_duration_days: int = 7        # prefer longer campaigns
-    brand_keywords: List[str] = None            # keywords buyer must respect
-    max_discount_pct: float = 10.0              # max % discount from listed min
+class OrganizerConfig:
+    """Constraints and preferences for the Organizer (event host) agent."""
+    organizer_name: str
+    absolute_min_price_per_day: float = 500.0
+    asking_price_per_day: Optional[float] = None   # defaults to 120% of min
+    preferred_min_duration_days: int = 1
+    audience_size: int = 0
+    max_discount_pct: float = 10.0
 
     def __post_init__(self):
-        if self.brand_keywords is None:
-            self.brand_keywords = ["family-friendly", "local", "community"]
         if self.asking_price_per_day is None:
             self.asking_price_per_day = round(self.absolute_min_price_per_day * 1.20, 2)
 
 
 @dataclass
-class BuyerConfig:
-    """Constraints and preferences for the buyer agent."""
-    buyer_name: str
-    client_name: str
-    max_budget_per_day: float = 50.0
-    target_price_per_day: Optional[float] = None  # desired opening offer; defaults to 70% of max
-    preferred_formats: List[str] = None
-    min_duration_days: int = 14
-    max_duration_days: int = 30
-    desired_start_date: str = "2026-04-07"      # next Monday
+class SponsorConfig:
+    """Constraints and preferences for the Sponsor agent."""
+    sponsor_name: str
+    company_name: str
+    max_budget_per_day: float = 1000.0
+    target_price_per_day: Optional[float] = None   # defaults to 70% of max
+    preferred_tiers: List[str] = None
+    min_duration_days: int = 1
+    max_duration_days: int = 7
+    desired_start_date: str = "2026-09-01"
 
     def __post_init__(self):
-        if self.preferred_formats is None:
-            self.preferred_formats = ["digital_screen"]
+        if self.preferred_tiers is None:
+            self.preferred_tiers = ["Sponsorship Package"]
         if self.target_price_per_day is None:
             self.target_price_per_day = round(self.max_budget_per_day * 0.70, 2)
 
 
+# Backwards-compat aliases used by agent_bridge.py aliases
+SellerConfig = OrganizerConfig
+BuyerConfig = SponsorConfig
+
+
 # ---------------------------------------------------------------------------
-# Seller Agent
+# Organizer Agent (event host / "seller")
 # ---------------------------------------------------------------------------
 
-class SellerAgent:
-    def __init__(self, platform: NegotiationPlatform, config: SellerConfig) -> None:
+class OrganizerAgent:
+    def __init__(self, platform: NegotiationPlatform, config: OrganizerConfig) -> None:
         self.platform = platform
         self.config = config
         self.client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
-        self.system_prompt = f"""You are an AI agent representing {config.seller_name}, a coffee shop owner.
+        audience_note = (
+            f" The event has an audience of {config.audience_size:,} people."
+            if config.audience_size > 0 else ""
+        )
 
-Your goal is to negotiate advertising deals that maximize revenue while maintaining the coffee shop's brand image.
+        self.system_prompt = f"""You are an AI agent representing {config.organizer_name}, an event organizer seeking sponsorship.
+
+Your goal is to close a sponsorship deal that secures the funding your event needs while offering fair value to sponsors.{audience_note}
 
 CONSTRAINTS & GUIDELINES:
-- Absolute minimum price: ${config.absolute_min_price_per_day:.2f}/day (NEVER go below this — hard floor)
-- Asking / opening price: ${config.asking_price_per_day:.2f}/day (start here on your first proposal or counter)
+- Absolute minimum price: ${config.absolute_min_price_per_day:,.2f}/day (NEVER go below — hard floor)
+- Opening / asking price: ${config.asking_price_per_day:,.2f}/day (start here on your first proposal or counter)
 - Maximum discount from asking price: {config.max_discount_pct}%
-- Preferred minimum campaign duration: {config.preferred_min_duration_days} days
-- Brand keywords buyers must respect: {', '.join(config.brand_keywords)}
-- Only allow formats that are listed for each specific ad space
-- Be professional and friendly but firm on pricing boundaries
-- If a counter-offer is reasonable (within 15% of your min), consider accepting
-- If a proposal meets your minimums, ACCEPT it rather than keep negotiating
-- Always use the tools to check inventory and history before responding
-- When you respond to a proposal, you MUST call respond_to_proposal with the proposal ID
+- Preferred minimum sponsorship duration: {config.preferred_min_duration_days} day(s)
+- Be professional and firm on your pricing floor — it reflects real event costs
+- If a sponsor's counter-offer is within 15% of your floor, seriously consider accepting
+- If a proposal meets your minimum, ACCEPT it rather than keep negotiating
+- Always check the package details and deal history before responding
+- When responding to a proposal, you MUST call respond_to_proposal with the proposal ID
 
-Negotiation strategy:
-1. First check the negotiation history to understand the current state
-2. If there is a pending proposal from the buyer, respond to it (accept, reject, or counter)
-3. Open with your asking price (${config.asking_price_per_day:.2f}/day); only concede toward your floor gradually
-4. When countering, move incrementally toward the buyer but protect your absolute minimum
-5. Be concise in your messages – keep them under 3 sentences
+Deal strategy:
+1. Check the deal history to understand the current state
+2. If there is a pending proposal from the sponsor, respond to it (accept, reject, or counter)
+3. Open at your asking price (${config.asking_price_per_day:,.2f}/day); concede toward your floor gradually
+4. When countering, move incrementally — show good faith but protect your absolute minimum
+5. Be concise — keep messages under 3 sentences
 
-IMPORTANT: When you are done negotiating for this turn, end your response with a brief plain-text summary of what action you took."""
+IMPORTANT: End your response with a brief plain-text summary of the action you took."""
 
         self.tools: List[Dict] = [
             {
-                "name": "view_inventory",
-                "description": "View all available advertising spaces with their details and pricing.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {},
-                    "required": [],
-                },
+                "name": "view_packages",
+                "description": "View all available sponsorship packages with their details and pricing.",
+                "input_schema": {"type": "object", "properties": {}, "required": []},
             },
             {
-                "name": "view_negotiation_history",
-                "description": "View the full history of all proposals made so far in this negotiation.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {},
-                    "required": [],
-                },
+                "name": "view_deal_history",
+                "description": "View the full history of all proposals made so far in this deal session.",
+                "input_schema": {"type": "object", "properties": {}, "required": []},
             },
             {
                 "name": "respond_to_proposal",
@@ -133,37 +130,21 @@ IMPORTANT: When you are done negotiating for this turn, end your response with a
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "proposal_id": {
-                            "type": "string",
-                            "description": "The ID of the proposal to respond to.",
-                        },
-                        "action": {
-                            "type": "string",
-                            "enum": ["accept", "reject", "counter"],
-                            "description": "The action to take.",
-                        },
-                        "message": {
-                            "type": "string",
-                            "description": "A brief message explaining your decision.",
-                        },
+                        "proposal_id": {"type": "string", "description": "The ID of the proposal to respond to."},
+                        "action": {"type": "string", "enum": ["accept", "reject", "counter"], "description": "The action to take."},
+                        "message": {"type": "string", "description": "A brief message explaining your decision."},
                         "counter_terms": {
                             "type": "object",
                             "description": "Required when action='counter'. New proposed terms.",
                             "properties": {
-                                "ad_space_id": {"type": "string"},
-                                "format": {"type": "string"},
+                                "package_id": {"type": "string"},
+                                "tier": {"type": "string"},
                                 "duration_days": {"type": "integer"},
                                 "price_per_day": {"type": "number"},
                                 "start_date": {"type": "string"},
                                 "special_conditions": {"type": "string"},
                             },
-                            "required": [
-                                "ad_space_id",
-                                "format",
-                                "duration_days",
-                                "price_per_day",
-                                "start_date",
-                            ],
+                            "required": ["package_id", "tier", "duration_days", "price_per_day", "start_date"],
                         },
                     },
                     "required": ["proposal_id", "action", "message"],
@@ -171,28 +152,22 @@ IMPORTANT: When you are done negotiating for this turn, end your response with a
             },
             {
                 "name": "make_initial_proposal",
-                "description": "Submit the very first proposal if the seller goes first.",
+                "description": "Submit the very first proposal if the organizer goes first.",
                 "input_schema": {
                     "type": "object",
                     "properties": {
                         "terms_dict": {
                             "type": "object",
-                            "description": "Proposed terms.",
+                            "description": "Proposed sponsorship terms.",
                             "properties": {
-                                "ad_space_id": {"type": "string"},
-                                "format": {"type": "string"},
+                                "package_id": {"type": "string"},
+                                "tier": {"type": "string"},
                                 "duration_days": {"type": "integer"},
                                 "price_per_day": {"type": "number"},
                                 "start_date": {"type": "string"},
                                 "special_conditions": {"type": "string"},
                             },
-                            "required": [
-                                "ad_space_id",
-                                "format",
-                                "duration_days",
-                                "price_per_day",
-                                "start_date",
-                            ],
+                            "required": ["package_id", "tier", "duration_days", "price_per_day", "start_date"],
                         },
                         "message": {"type": "string"},
                     },
@@ -203,10 +178,10 @@ IMPORTANT: When you are done negotiating for this turn, end your response with a
 
     def _execute_tool(self, name: str, inputs: Dict[str, Any]) -> str:
         try:
-            if name == "view_inventory":
+            if name == "view_packages":
                 return self.platform.get_inventory_summary()
 
-            if name == "view_negotiation_history":
+            if name == "view_deal_history":
                 return self.platform.get_negotiation_history()
 
             if name == "respond_to_proposal":
@@ -215,15 +190,14 @@ IMPORTANT: When you are done negotiating for this turn, end your response with a
                 message: str = inputs.get("message", "")
                 counter_terms_dict: Optional[Dict] = inputs.get("counter_terms")
 
-                # Validate counter-offer terms before submission
                 if action == "counter" and counter_terms_dict:
-                    available_fmts = []
-                    for sp in self.platform.ad_inventory:
-                        available_fmts.extend(sp.available_formats)
-                    ok, err = validate_seller_terms(
+                    available_tiers = []
+                    for pkg in self.platform.packages:
+                        available_tiers.extend(pkg.available_tiers)
+                    ok, err = validate_organizer_terms(
                         counter_terms_dict,
                         absolute_min_price=self.config.absolute_min_price_per_day,
-                        available_formats=available_fmts or None,
+                        available_tiers=available_tiers or None,
                     )
                     if not ok:
                         return err
@@ -231,8 +205,8 @@ IMPORTANT: When you are done negotiating for this turn, end your response with a
                 counter_terms: Optional[NegotiationTerm] = None
                 if counter_terms_dict:
                     counter_terms = NegotiationTerm(
-                        ad_space_id=counter_terms_dict["ad_space_id"],
-                        format=counter_terms_dict["format"],
+                        package_id=counter_terms_dict["package_id"],
+                        tier=counter_terms_dict["tier"],
                         duration_days=int(counter_terms_dict["duration_days"]),
                         price_per_day=float(counter_terms_dict["price_per_day"]),
                         start_date=counter_terms_dict["start_date"],
@@ -249,19 +223,19 @@ IMPORTANT: When you are done negotiating for this turn, end your response with a
 
             if name == "make_initial_proposal":
                 td = inputs["terms_dict"]
-                available_fmts = []
-                for sp in self.platform.ad_inventory:
-                    available_fmts.extend(sp.available_formats)
-                ok, err = validate_seller_terms(
+                available_tiers = []
+                for pkg in self.platform.packages:
+                    available_tiers.extend(pkg.available_tiers)
+                ok, err = validate_organizer_terms(
                     td,
                     absolute_min_price=self.config.absolute_min_price_per_day,
-                    available_formats=available_fmts or None,
+                    available_tiers=available_tiers or None,
                 )
                 if not ok:
                     return err
                 terms = NegotiationTerm(
-                    ad_space_id=td["ad_space_id"],
-                    format=td["format"],
+                    package_id=td["package_id"],
+                    tier=td["tier"],
                     duration_days=int(td["duration_days"]),
                     price_per_day=float(td["price_per_day"]),
                     start_date=td["start_date"],
@@ -280,7 +254,6 @@ IMPORTANT: When you are done negotiating for this turn, end your response with a
             return f"Error executing tool {name!r}: {exc}"
 
     def take_turn(self, context: str) -> str:
-        """Run the full agentic loop for one turn. Returns a summary string."""
         messages: List[Dict] = [{"role": "user", "content": context}]
 
         while True:
@@ -293,196 +266,135 @@ IMPORTANT: When you are done negotiating for this turn, end your response with a
                 messages=messages,
             )
 
-            # Record assistant turn
             messages.append({"role": "assistant", "content": response.content})
 
             if response.stop_reason == "end_turn":
                 for block in response.content:
                     if hasattr(block, "text") and block.text:
                         return block.text
-                return "Seller agent completed its turn."
+                return "Organizer agent completed its turn."
 
             if response.stop_reason == "tool_use":
                 tool_results = []
                 for block in response.content:
                     if block.type == "tool_use":
-                        print(
-                            f"  {BLUE}[tool] {block.name}({json.dumps(block.input, indent=None)}){RESET}"
-                        )
+                        print(f"  {BLUE}[organizer tool] {block.name}({json.dumps(block.input, indent=None)}){RESET}")
                         result = self._execute_tool(block.name, block.input)
-                        tool_results.append(
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": block.id,
-                                "content": str(result),
-                            }
-                        )
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": str(result),
+                        })
                 messages.append({"role": "user", "content": tool_results})
             else:
-                # Unexpected stop reason
                 return f"Unexpected stop reason: {response.stop_reason}"
 
 
 # ---------------------------------------------------------------------------
-# Buyer Agent
+# Sponsor Agent ("buyer")
 # ---------------------------------------------------------------------------
 
-class BuyerAgent:
-    def __init__(self, platform: NegotiationPlatform, config: BuyerConfig) -> None:
+class SponsorAgent:
+    def __init__(self, platform: NegotiationPlatform, config: SponsorConfig) -> None:
         self.platform = platform
         self.config = config
         self.client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
-        self.system_prompt = f"""You are an AI agent representing {config.buyer_name}, an advertising agency.
+        self.system_prompt = f"""You are an AI agent representing {config.sponsor_name}, a company looking to sponsor events.
 
-You are negotiating on behalf of your client: {config.client_name}.
+You are negotiating on behalf of: {config.company_name}.
 
-Your goal is to secure the best possible advertising space at the lowest cost within budget.
+Your goal is to secure the best sponsorship package at the lowest cost within your budget.
 
 CONSTRAINTS & GUIDELINES:
-- Target / opening offer: ${config.target_price_per_day:.2f}/day (start here on your first proposal)
-- Maximum budget: ${config.max_budget_per_day:.2f}/day (NEVER exceed this — hard ceiling)
-- Acceptable price range: ${config.target_price_per_day:.2f}–${config.max_budget_per_day:.2f}/day
-- Preferred formats: {', '.join(config.preferred_formats)}
-- Required campaign duration: {config.min_duration_days}–{config.max_duration_days} days
+- Opening / target offer: ${config.target_price_per_day:,.2f}/day (start here on your first proposal)
+- Maximum budget: ${config.max_budget_per_day:,.2f}/day (NEVER exceed — hard ceiling)
+- Acceptable price range: ${config.target_price_per_day:,.2f}–${config.max_budget_per_day:,.2f}/day
+- Preferred sponsorship tiers: {', '.join(config.preferred_tiers)}
+- Required event duration: {config.min_duration_days}–{config.max_duration_days} day(s)
 - Desired start date: {config.desired_start_date}
-- You are professional, data-driven, and willing to negotiate
-- Open with your target price (${config.target_price_per_day:.2f}/day); only go up toward your ceiling gradually
-- If the seller's counter is within 10% of your max budget, consider accepting
-- If no agreement after several rounds, be willing to accept a reasonable price
-- Always check available spaces and history before making/countering a proposal
-- Be concise – keep messages under 3 sentences
+- Open with your target price; only increase toward your ceiling gradually
+- If the organizer's counter is within 10% of your ceiling, consider accepting
+- Always check available packages and history before making or countering a proposal
+- Be concise — keep messages under 3 sentences
 
-Negotiation strategy:
-1. Check inventory to find suitable spaces (prefer digital_screen format)
-2. Check history to understand where the negotiation stands
-3. If there is a pending proposal from the seller, respond (accept or counter)
-4. If it's your first move, submit an opening proposal at your target price (${config.target_price_per_day:.2f}/day)
-5. Escalate price incrementally when countering – show good faith but stay within your ceiling
+Deal strategy:
+1. Check the available packages to find a suitable sponsorship opportunity
+2. Check history to understand where the deal stands
+3. If there is a pending proposal from the organizer, respond (accept or counter)
+4. If it's your first move, submit an opening proposal at your target price (${config.target_price_per_day:,.2f}/day)
+5. Increase your offer incrementally when countering — show good faith but stay within your ceiling
 
-IMPORTANT: When you are done for this turn, end with a plain-text summary of the action you took."""
+IMPORTANT: End your response with a plain-text summary of the action you took."""
 
         self.tools: List[Dict] = [
             {
-                "name": "view_available_spaces",
-                "description": "View all available advertising spaces with details and pricing.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {},
-                    "required": [],
-                },
+                "name": "view_packages",
+                "description": "View all available sponsorship packages with details and pricing.",
+                "input_schema": {"type": "object", "properties": {}, "required": []},
             },
             {
-                "name": "view_negotiation_history",
+                "name": "view_deal_history",
                 "description": "View the full history of proposals exchanged so far.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {},
-                    "required": [],
-                },
+                "input_schema": {"type": "object", "properties": {}, "required": []},
             },
             {
                 "name": "submit_proposal",
-                "description": "Submit a new proposal to the seller.",
+                "description": "Submit a new sponsorship proposal to the organizer.",
                 "input_schema": {
                     "type": "object",
                     "properties": {
                         "terms_dict": {
                             "type": "object",
-                            "description": "Proposed advertising terms.",
+                            "description": "Proposed sponsorship terms.",
                             "properties": {
-                                "ad_space_id": {
-                                    "type": "string",
-                                    "description": "ID of the desired ad space.",
-                                },
-                                "format": {
-                                    "type": "string",
-                                    "description": "Desired advertising format.",
-                                },
-                                "duration_days": {
-                                    "type": "integer",
-                                    "description": "Number of days for the campaign.",
-                                },
-                                "price_per_day": {
-                                    "type": "number",
-                                    "description": "Offered price per day in USD.",
-                                },
-                                "start_date": {
-                                    "type": "string",
-                                    "description": "Desired start date (YYYY-MM-DD).",
-                                },
-                                "special_conditions": {
-                                    "type": "string",
-                                    "description": "Any special conditions or notes.",
-                                },
+                                "package_id": {"type": "string", "description": "ID of the sponsorship package."},
+                                "tier": {"type": "string", "description": "Sponsorship tier (e.g. 'Title Sponsor', 'Gold Sponsor')."},
+                                "duration_days": {"type": "integer", "description": "Number of event days covered."},
+                                "price_per_day": {"type": "number", "description": "Offered price per day in USD."},
+                                "start_date": {"type": "string", "description": "Desired start date (YYYY-MM-DD)."},
+                                "special_conditions": {"type": "string", "description": "Any special conditions or notes."},
                             },
-                            "required": [
-                                "ad_space_id",
-                                "format",
-                                "duration_days",
-                                "price_per_day",
-                                "start_date",
-                            ],
+                            "required": ["package_id", "tier", "duration_days", "price_per_day", "start_date"],
                         },
-                        "message": {
-                            "type": "string",
-                            "description": "Message to the seller explaining your proposal.",
-                        },
+                        "message": {"type": "string", "description": "Message to the organizer explaining your offer."},
                     },
                     "required": ["terms_dict", "message"],
                 },
             },
             {
-                "name": "accept_current_proposal",
-                "description": "Accept the seller's current pending proposal.",
+                "name": "accept_proposal",
+                "description": "Accept the organizer's current pending proposal.",
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "proposal_id": {
-                            "type": "string",
-                            "description": "ID of the proposal to accept.",
-                        },
-                        "message": {
-                            "type": "string",
-                            "description": "Acceptance message.",
-                        },
+                        "proposal_id": {"type": "string", "description": "ID of the proposal to accept."},
+                        "message": {"type": "string", "description": "Acceptance message."},
                     },
                     "required": ["proposal_id", "message"],
                 },
             },
             {
                 "name": "counter_proposal",
-                "description": "Counter the seller's proposal with new terms.",
+                "description": "Counter the organizer's proposal with new terms.",
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "proposal_id": {
-                            "type": "string",
-                            "description": "ID of the proposal being countered.",
-                        },
+                        "proposal_id": {"type": "string", "description": "ID of the proposal being countered."},
                         "counter_terms_dict": {
                             "type": "object",
                             "description": "New proposed terms.",
                             "properties": {
-                                "ad_space_id": {"type": "string"},
-                                "format": {"type": "string"},
+                                "package_id": {"type": "string"},
+                                "tier": {"type": "string"},
                                 "duration_days": {"type": "integer"},
                                 "price_per_day": {"type": "number"},
                                 "start_date": {"type": "string"},
                                 "special_conditions": {"type": "string"},
                             },
-                            "required": [
-                                "ad_space_id",
-                                "format",
-                                "duration_days",
-                                "price_per_day",
-                                "start_date",
-                            ],
+                            "required": ["package_id", "tier", "duration_days", "price_per_day", "start_date"],
                         },
-                        "message": {
-                            "type": "string",
-                            "description": "Message explaining your counter-offer.",
-                        },
+                        "message": {"type": "string", "description": "Message explaining your counter-offer."},
                     },
                     "required": ["proposal_id", "counter_terms_dict", "message"],
                 },
@@ -491,15 +403,15 @@ IMPORTANT: When you are done for this turn, end with a plain-text summary of the
 
     def _execute_tool(self, name: str, inputs: Dict[str, Any]) -> str:
         try:
-            if name == "view_available_spaces":
+            if name == "view_packages":
                 return self.platform.get_inventory_summary()
 
-            if name == "view_negotiation_history":
+            if name == "view_deal_history":
                 return self.platform.get_negotiation_history()
 
             if name == "submit_proposal":
                 td = inputs["terms_dict"]
-                ok, err = validate_buyer_terms(
+                ok, err = validate_sponsor_terms(
                     td,
                     max_budget_per_day=self.config.max_budget_per_day,
                     min_duration_days=self.config.min_duration_days,
@@ -508,8 +420,8 @@ IMPORTANT: When you are done for this turn, end with a plain-text summary of the
                 if not ok:
                     return err
                 terms = NegotiationTerm(
-                    ad_space_id=td["ad_space_id"],
-                    format=td["format"],
+                    package_id=td["package_id"],
+                    tier=td["tier"],
                     duration_days=int(td["duration_days"]),
                     price_per_day=float(td["price_per_day"]),
                     start_date=td["start_date"],
@@ -522,7 +434,7 @@ IMPORTANT: When you are done for this turn, end with a plain-text summary of the
                 )
                 return f"Proposal submitted. ID: {proposal.id}"
 
-            if name == "accept_current_proposal":
+            if name == "accept_proposal":
                 result = self.platform.respond_to_proposal(
                     proposal_id=inputs["proposal_id"],
                     action="accept",
@@ -532,7 +444,7 @@ IMPORTANT: When you are done for this turn, end with a plain-text summary of the
 
             if name == "counter_proposal":
                 ctd = inputs["counter_terms_dict"]
-                ok, err = validate_buyer_terms(
+                ok, err = validate_sponsor_terms(
                     ctd,
                     max_budget_per_day=self.config.max_budget_per_day,
                     min_duration_days=self.config.min_duration_days,
@@ -541,8 +453,8 @@ IMPORTANT: When you are done for this turn, end with a plain-text summary of the
                 if not ok:
                     return err
                 counter_terms = NegotiationTerm(
-                    ad_space_id=ctd["ad_space_id"],
-                    format=ctd["format"],
+                    package_id=ctd["package_id"],
+                    tier=ctd["tier"],
                     duration_days=int(ctd["duration_days"]),
                     price_per_day=float(ctd["price_per_day"]),
                     start_date=ctd["start_date"],
@@ -562,7 +474,6 @@ IMPORTANT: When you are done for this turn, end with a plain-text summary of the
             return f"Error executing tool {name!r}: {exc}"
 
     def take_turn(self, context: str) -> str:
-        """Run the full agentic loop for one turn. Returns a summary string."""
         messages: List[Dict] = [{"role": "user", "content": context}]
 
         while True:
@@ -575,30 +486,30 @@ IMPORTANT: When you are done for this turn, end with a plain-text summary of the
                 messages=messages,
             )
 
-            # Record assistant turn
             messages.append({"role": "assistant", "content": response.content})
 
             if response.stop_reason == "end_turn":
                 for block in response.content:
                     if hasattr(block, "text") and block.text:
                         return block.text
-                return "Buyer agent completed its turn."
+                return "Sponsor agent completed its turn."
 
             if response.stop_reason == "tool_use":
                 tool_results = []
                 for block in response.content:
                     if block.type == "tool_use":
-                        print(
-                            f"  {GREEN}[tool] {block.name}({json.dumps(block.input, indent=None)}){RESET}"
-                        )
+                        print(f"  {GREEN}[sponsor tool] {block.name}({json.dumps(block.input, indent=None)}){RESET}")
                         result = self._execute_tool(block.name, block.input)
-                        tool_results.append(
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": block.id,
-                                "content": str(result),
-                            }
-                        )
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": str(result),
+                        })
                 messages.append({"role": "user", "content": tool_results})
             else:
                 return f"Unexpected stop reason: {response.stop_reason}"
+
+
+# Backwards-compat aliases
+SellerAgent = OrganizerAgent
+BuyerAgent = SponsorAgent

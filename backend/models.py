@@ -1,5 +1,5 @@
 """
-Data models for the agent-to-agent advertising space negotiation system.
+Data models for the AI-powered event sponsorship deal platform.
 """
 
 from dataclasses import dataclass, field
@@ -9,42 +9,42 @@ import uuid
 
 
 @dataclass
-class AdSpace:
+class SponsorshipPackage:
     id: str
     name: str
     location: str
-    available_formats: List[str]
+    available_tiers: List[str]
     min_price_per_day: float
     max_duration_days: int
-    available_from: str  # ISO date string e.g. "2026-04-07"
-    seller_notes: str
+    available_from: str      # ISO date string e.g. "2026-09-01"
+    organizer_notes: str
 
     def to_dict(self) -> dict:
         return {
             "id": self.id,
             "name": self.name,
             "location": self.location,
-            "available_formats": self.available_formats,
+            "available_tiers": self.available_tiers,
             "min_price_per_day": self.min_price_per_day,
             "max_duration_days": self.max_duration_days,
             "available_from": self.available_from,
-            "seller_notes": self.seller_notes,
+            "organizer_notes": self.organizer_notes,
         }
 
 
 @dataclass
 class NegotiationTerm:
-    ad_space_id: str
-    format: str
+    package_id: str
+    tier: str
     duration_days: int
     price_per_day: float
-    start_date: str  # ISO date string
+    start_date: str          # ISO date string
     special_conditions: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
-            "ad_space_id": self.ad_space_id,
-            "format": self.format,
+            "package_id": self.package_id,
+            "tier": self.tier,
             "duration_days": self.duration_days,
             "price_per_day": self.price_per_day,
             "start_date": self.start_date,
@@ -75,9 +75,9 @@ class Proposal:
 @dataclass
 class Contract:
     id: str
-    seller_name: str
-    buyer_name: str
-    ad_space: AdSpace
+    organizer_name: str
+    sponsor_name: str
+    package: SponsorshipPackage
     terms: NegotiationTerm
     total_price: float
     created_at: str
@@ -86,9 +86,9 @@ class Contract:
     def to_dict(self) -> dict:
         return {
             "id": self.id,
-            "seller_name": self.seller_name,
-            "buyer_name": self.buyer_name,
-            "ad_space": self.ad_space.to_dict(),
+            "organizer_name": self.organizer_name,
+            "sponsor_name": self.sponsor_name,
+            "package": self.package.to_dict(),
             "terms": self.terms.to_dict(),
             "total_price": self.total_price,
             "created_at": self.created_at,
@@ -100,31 +100,31 @@ class Contract:
         thin_sep = "-" * 60
         lines = [
             separator,
-            "           ADVERTISING SPACE CONTRACT",
+            "        EVENT SPONSORSHIP AGREEMENT",
             separator,
-            f"Contract ID : {self.id}",
-            f"Date Created: {self.created_at}",
-            f"Status      : {'SIGNED' if self.signed else 'UNSIGNED'}",
+            f"Contract ID   : {self.id}",
+            f"Date Created  : {self.created_at}",
+            f"Status        : {'SIGNED' if self.signed else 'UNSIGNED'}",
             thin_sep,
             "PARTIES",
             thin_sep,
-            f"  Seller (Landlord) : {self.seller_name}",
-            f"  Buyer  (Advertiser): {self.buyer_name}",
+            f"  Organizer : {self.organizer_name}",
+            f"  Sponsor   : {self.sponsor_name}",
             thin_sep,
-            "ADVERTISING SPACE",
+            "SPONSORSHIP PACKAGE",
             thin_sep,
-            f"  Space ID  : {self.ad_space.id}",
-            f"  Name      : {self.ad_space.name}",
-            f"  Location  : {self.ad_space.location}",
-            f"  Notes     : {self.ad_space.seller_notes}",
+            f"  Package ID    : {self.package.id}",
+            f"  Package Name  : {self.package.name}",
+            f"  Location      : {self.package.location}",
+            f"  Notes         : {self.package.organizer_notes}",
             thin_sep,
             "AGREED TERMS",
             thin_sep,
-            f"  Format            : {self.terms.format}",
+            f"  Tier              : {self.terms.tier}",
             f"  Duration          : {self.terms.duration_days} days",
             f"  Start Date        : {self.terms.start_date}",
             f"  Price Per Day     : ${self.terms.price_per_day:.2f}",
-            f"  TOTAL CONTRACT VALUE: ${self.total_price:.2f}",
+            f"  TOTAL DEAL VALUE  : ${self.total_price:.2f}",
         ]
         if self.terms.special_conditions:
             lines.append(f"  Special Conditions: {self.terms.special_conditions}")
@@ -132,8 +132,8 @@ class Contract:
             thin_sep,
             "SIGNATURES",
             thin_sep,
-            f"  {self.seller_name} (Seller): {'[SIGNED]' if self.signed else '[PENDING]'}",
-            f"  {self.buyer_name} (Buyer) : {'[SIGNED]' if self.signed else '[PENDING]'}",
+            f"  {self.organizer_name} (Organizer) : {'[SIGNED]' if self.signed else '[PENDING]'}",
+            f"  {self.sponsor_name}  (Sponsor)   : {'[SIGNED]' if self.signed else '[PENDING]'}",
             separator,
         ]
         return "\n".join(lines)
