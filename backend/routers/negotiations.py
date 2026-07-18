@@ -259,15 +259,27 @@ def start_negotiation(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    # Validate buyer company
-    buyer_company = db.query(Company).filter(Company.id == body.buyer_company_id).first()
-    if not buyer_company:
-        raise HTTPException(status_code=404, detail="Buyer company not found")
+    # Validate the initiating company
+    initiating_company = db.query(Company).filter(Company.id == body.buyer_company_id).first()
+    if not initiating_company:
+        raise HTTPException(status_code=404, detail="Company not found")
 
-    seller_company = listing.company
+    listing_company = listing.company
+
+    # Auto-assign seller/buyer roles based on who owns the listing.
+    # If the listing belongs to a sponsor (buyer), the initiating company is
+    # the organizer (seller) and the listing owner is the buyer — roles reversed.
+    reverse_roles = listing_company.type == "sponsor"
+
+    if reverse_roles:
+        seller_company = initiating_company   # organizer pitching to the sponsor
+        buyer_company  = listing_company      # sponsor who posted the listing
+    else:
+        seller_company = listing_company      # organizer who posted the package
+        buyer_company  = initiating_company   # sponsor initiating the deal
 
     # Build negotiation title
-    title = f"{listing.title} — {buyer_company.name}"
+    title = f"{listing.title} — {initiating_company.name}"
 
     # Create negotiation row
     neg = Negotiation(
@@ -287,14 +299,30 @@ def start_negotiation(
 
     negotiation_id = neg.id
 
-    buyer_config_overrides = {
-        "max_budget_per_unit": body.max_budget_per_unit,
-        "target_price_per_unit": body.target_price_per_unit,
-        "preferred_duration_days": body.preferred_duration_days,
-        "start_date": body.start_date,
-        "buyer_name": buyer_company.name,
-        "client_name": buyer_company.name,
-    }
+    if reverse_roles:
+        # Organizer initiated: form fields carry organizer pricing, not sponsor budget.
+        # max_budget_per_unit = organizer's asking/opening price
+        # target_price_per_unit = organizer's floor (minimum they'll accept)
+        # Sponsor config will be built from the listing's own terms_json in the runner.
+        buyer_config_overrides = {
+            "reverse_roles": True,
+            "organizer_floor_price": body.target_price_per_unit or body.max_budget_per_unit * 0.8,
+            "organizer_asking_price": body.max_budget_per_unit,
+            "preferred_duration_days": body.preferred_duration_days,
+            "start_date": body.start_date,
+            "buyer_name": buyer_company.name,
+            "client_name": buyer_company.name,
+        }
+    else:
+        buyer_config_overrides = {
+            "max_budget_per_unit": body.max_budget_per_unit,
+            "target_price_per_unit": body.target_price_per_unit,
+            "preferred_duration_days": body.preferred_duration_days,
+            "start_date": body.start_date,
+            "buyer_name": buyer_company.name,
+            "client_name": buyer_company.name,
+        }
+
     # Persist buyer config so it can be reused on renegotiation
     neg.buyer_config_json = json.dumps(buyer_config_overrides)
     db.commit()

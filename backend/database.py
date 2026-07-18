@@ -96,7 +96,7 @@ class Company(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
     name: Mapped[str] = mapped_column(String, nullable=False)
-    type: Mapped[str] = mapped_column(String, nullable=False)  # "seller", "buyer", "both"
+    type: Mapped[str] = mapped_column(String, nullable=False)  # "organizer", "sponsor", "both"
     industry: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     avatar_color: Mapped[str] = mapped_column(String, default="#6366f1")

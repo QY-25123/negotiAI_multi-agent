@@ -131,6 +131,60 @@ def build_sponsor_config(overrides: Dict[str, Any]) -> "SponsorConfig":
     )
 
 
+def build_organizer_config_from_overrides(
+    organizer_name: str,
+    overrides: Dict[str, Any],
+) -> "OrganizerConfig":
+    """
+    Build an OrganizerConfig from form overrides (used in the reverse flow where
+    an organizer initiates a deal from a sponsor's listing).
+    organizer_floor_price  → absolute minimum the organizer will accept
+    organizer_asking_price → opening ask / desired price
+    """
+    floor = float(overrides.get("organizer_floor_price", 500.0))
+    asking = overrides.get("organizer_asking_price")
+    asking_price = float(asking) if asking is not None else None
+
+    return OrganizerConfig(
+        organizer_name=organizer_name,
+        absolute_min_price_per_day=floor,
+        asking_price_per_day=asking_price,
+        preferred_min_duration_days=int(overrides.get("preferred_duration_days", 1)),
+        max_discount_pct=10.0,
+    )
+
+
+def build_sponsor_config_from_listing(
+    sponsor_name: str,
+    listing_terms_json_str: str,
+) -> "SponsorConfig":
+    """
+    Build a SponsorConfig from a sponsor's own listing terms_json (used in the
+    reverse flow where the sponsor's listing drives their config rather than
+    form inputs from a sponsor user).
+    """
+    _require_api_key()
+    try:
+        terms: Dict[str, Any] = json.loads(listing_terms_json_str or "{}")
+    except Exception:
+        terms = {}
+
+    max_budget = float(terms.get("max_budget_per_day", 1000.0))
+    raw_target = terms.get("target_price_per_day")
+    target_price = float(raw_target) if raw_target is not None else None
+    min_dur = int(terms.get("preferred_duration_days", 1))
+    max_dur = int(terms.get("max_duration_days", min_dur))
+
+    return SponsorConfig(
+        sponsor_name=sponsor_name,
+        company_name=sponsor_name,
+        max_budget_per_day=max_budget,
+        target_price_per_day=target_price,
+        min_duration_days=min_dur,
+        max_duration_days=max_dur,
+    )
+
+
 # Keep old function names as aliases so negotiation_runner.py import still works
 # until we update the call sites
 build_seller_config = build_organizer_config

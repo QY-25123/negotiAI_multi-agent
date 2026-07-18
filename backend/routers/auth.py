@@ -31,7 +31,7 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     company_name: str
-    company_type: str  # "seller" | "buyer" | "both"
+    company_type: str  # "organizer" | "sponsor" | "both"
     industry: str
     description: str = ""
     avatar_color: str = "#6366f1"
@@ -182,7 +182,7 @@ def demo_login(db: Session = Depends(get_db)):
     else:
         company = Company(
             name="Demo Visitor",
-            type="buyer",
+            type="sponsor",
             industry="Technology",
             description="Demo account — exploring AI-powered B2B negotiation",
             avatar_color="#3b82f6",

@@ -19,7 +19,7 @@ export default function Register() {
   const router = useRouter();
   const [form, setForm] = useState({
     email: "", password: "", confirmPassword: "",
-    company_name: "", industry: "", company_type: "buyer",
+    company_name: "", industry: "", company_type: "sponsor",
     description: "", avatar_color: COLORS[0], website: "",
   });
   const [loading, setLoading] = useState(false);
@@ -43,7 +43,7 @@ export default function Register() {
         avatar_color: form.avatar_color,
         website: form.website || undefined,
       });
-      router.push(form.company_type === "buyer" ? "/marketplace" : "/marketplace");
+      router.push("/marketplace");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed");
       setLoading(false);
@@ -147,8 +147,8 @@ export default function Register() {
                       value={form.company_type}
                       onChange={e => setForm(f => ({ ...f, company_type: e.target.value }))}
                     >
-                      <option value="buyer">Sponsor — fund events for exposure</option>
-                      <option value="seller">Organizer — host events, seek sponsors</option>
+                      <option value="sponsor">Sponsor — fund events for exposure</option>
+                      <option value="organizer">Organizer — host events, seek sponsors</option>
                       <option value="both">Both</option>
                     </select>
                   </div>
