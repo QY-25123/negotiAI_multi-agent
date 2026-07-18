@@ -14,14 +14,14 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 
-from agents import BuyerAgent, SellerAgent  # noqa: E402
+from agents import SponsorAgent, OrganizerAgent  # noqa: E402
 from negotiation_platform import NegotiationPlatform  # noqa: E402
 
 from database import Contract, Negotiation, NegotiationMessage  # noqa: E402
 from services.agent_bridge import (  # noqa: E402
-    build_ad_space_from_listing,
-    build_buyer_config,
-    build_seller_config,
+    build_sponsorship_package_from_listing,
+    build_sponsor_config,
+    build_organizer_config,
 )
 
 _executor = ThreadPoolExecutor(max_workers=4)
@@ -30,6 +30,66 @@ MAX_ROUNDS = 10
 
 # Track which proposal IDs we've already persisted, keyed by negotiation_id
 _written_proposal_ids: Dict[str, set] = {}
+
+
+def _build_context(
+    turn_number: int,
+    max_rounds: int,
+    current_party: str,
+    platform,
+    organizer_config,
+    sponsor_config,
+) -> str:
+    """
+    Build the per-turn context string injected into each agent call.
+
+    Adds round pressure (rounds used / remaining) and a live price-gap
+    summary so agents can calibrate how aggressively to converge.
+    """
+    round_number = turn_number + 1          # 1-based round index
+    rounds_used = len(platform.negotiation_history)
+    rounds_remaining = max_rounds - rounds_used
+
+    # --- Derive latest prices from each side ----------------------------------
+    latest_buyer_price: Optional[float] = None
+    latest_seller_price: Optional[float] = None
+    for p in reversed(platform.negotiation_history):
+        if p.from_party == "buyer" and latest_buyer_price is None:
+            latest_buyer_price = p.terms.price_per_day
+        if p.from_party == "seller" and latest_seller_price is None:
+            latest_seller_price = p.terms.price_per_day
+        if latest_buyer_price is not None and latest_seller_price is not None:
+            break
+
+    # Fall back to configured limits when no proposals exist yet
+    effective_buyer = latest_buyer_price if latest_buyer_price is not None else sponsor_config.max_budget_per_day
+    effective_seller = latest_seller_price if latest_seller_price is not None else organizer_config.absolute_min_price_per_day
+    gap = effective_seller - effective_buyer
+
+    # --- Build pressure header ------------------------------------------------
+    if rounds_remaining <= 0:
+        pressure = "FINAL ROUND — this is your last chance to reach a deal. Make a meaningful concession or accept the current offer now."
+    elif rounds_remaining == 1:
+        pressure = "URGENT — only 1 round remains after this. If no deal is reached the session ends with no agreement."
+    elif rounds_remaining <= 3:
+        pressure = f"WARNING — only {rounds_remaining} rounds remaining. Start converging now or the session will end without a deal."
+    else:
+        pressure = f"{rounds_remaining} rounds remaining."
+
+    if gap > 0:
+        gap_line = f"Current price gap: ${gap:,.2f}/day (latest buyer offer ${effective_buyer:,.2f} vs latest organizer ask ${effective_seller:,.2f})."
+    elif gap <= 0:
+        gap_line = f"Prices have crossed — a deal is within reach (buyer ceiling ${effective_buyer:,.2f} >= organizer floor ${effective_seller:,.2f})."
+    else:
+        gap_line = ""
+
+    header = (
+        f"=== ROUND {round_number} of {max_rounds} | You are the {current_party.upper()} agent ===\n"
+        f"{pressure}\n"
+        f"{gap_line}\n"
+    )
+
+    return header + "\n" + platform.get_inventory_summary() + "\n\n" + platform.get_negotiation_history()
 
 
 async def run_negotiation(
@@ -78,8 +138,8 @@ async def run_negotiation(
                 except Exception:
                     pass
 
-            seller_config = build_seller_config(seller_company.name, listing.terms_json, override_constraints)
-            buyer_config = build_buyer_config(buyer_config_overrides)
+            organizer_config = build_organizer_config(seller_company.name, listing.terms_json, override_constraints)
+            sponsor_config = build_sponsor_config(buyer_config_overrides)
         except Exception as exc:
             await push(negotiation_id, {"type": "error", "detail": str(exc)})
             neg.status = "failed"
@@ -88,23 +148,41 @@ async def run_negotiation(
             db.commit()
             return
 
+        # ------------------------------------------------------------------
+        # ZOPA pre-check — if sponsor ceiling < organizer floor, skip agents
+        # ------------------------------------------------------------------
+        if sponsor_config.max_budget_per_day < organizer_config.absolute_min_price_per_day:
+            neg.status = "completed"
+            neg.outcome = "no_deal"
+            neg.round_count = 0
+            neg.failure_reason = (
+                f"No zone of possible agreement: sponsor ceiling "
+                f"${sponsor_config.max_budget_per_day:,.2f}/day is below "
+                f"organizer floor ${organizer_config.absolute_min_price_per_day:,.2f}/day. "
+                "Adjust budgets and try again."
+            )
+            neg.completed_at = datetime.utcnow()
+            db.commit()
+            await push(negotiation_id, {"type": "complete", "outcome": "no_deal", "contract_id": None})
+            return
+
         # Use per-negotiation max_rounds (set when negotiation was created)
         platform = NegotiationPlatform(
-            seller_name=seller_company.name,
-            buyer_name=buyer_company.name,
+            organizer_name=seller_company.name,
+            sponsor_name=buyer_company.name,
             max_rounds=neg.max_rounds,
         )
 
-        ad_space = build_ad_space_from_listing(
+        package = build_sponsorship_package_from_listing(
             listing_id=listing.id,
             listing_title=listing.title,
             listing_location=listing.location,
             terms_json_str=listing.terms_json,
         )
-        platform.register_ad_spaces([ad_space])
+        platform.register_packages([package])
 
-        seller_agent = SellerAgent(platform, seller_config)
-        buyer_agent = BuyerAgent(platform, buyer_config)
+        organizer_agent = OrganizerAgent(platform, organizer_config)
+        sponsor_agent = SponsorAgent(platform, sponsor_config)
 
         db_round_count = 0  # Number of DB messages written
         turn_number = 0
@@ -125,18 +203,20 @@ async def run_negotiation(
             # Determine whose turn it is
             if turn_number % 2 == 0:
                 current_party = "buyer"
-                agent = buyer_agent
+                agent = sponsor_agent
                 await push(negotiation_id, {"type": "thinking", "party": "buyer"})
             else:
                 current_party = "seller"
-                agent = seller_agent
+                agent = organizer_agent
                 await push(negotiation_id, {"type": "thinking", "party": "seller"})
 
-            context = (
-                f"It is turn {turn_number + 1}. "
-                + platform.get_inventory_summary()
-                + "\n\n"
-                + platform.get_negotiation_history()
+            context = _build_context(
+                turn_number=turn_number,
+                max_rounds=neg.max_rounds,
+                current_party=current_party,
+                platform=platform,
+                organizer_config=organizer_config,
+                sponsor_config=sponsor_config,
             )
 
             def _run_turn(ctx=context, a=agent):
@@ -269,7 +349,7 @@ async def _flush_new_proposals(
                     action="accept",
                     price_per_unit=proposal.terms.price_per_day,
                     duration_days=proposal.terms.duration_days,
-                    format_type=proposal.terms.format,
+                    format_type=proposal.terms.tier,
                     message=f"Accepted terms: ${proposal.terms.price_per_day:.2f}/day × {proposal.terms.duration_days} days.",
                     terms_json=json.dumps(proposal.terms.to_dict()),
                 )
@@ -316,7 +396,7 @@ async def _flush_new_proposals(
                         action="reject",
                         price_per_unit=proposal.terms.price_per_day,
                         duration_days=proposal.terms.duration_days,
-                        format_type=proposal.terms.format,
+                        format_type=proposal.terms.tier,
                         message="Rejected the proposal.",
                         terms_json=json.dumps(proposal.terms.to_dict()),
                     )
@@ -356,7 +436,7 @@ def _make_db_message(
         action=action,
         price_per_unit=proposal.terms.price_per_day,
         duration_days=proposal.terms.duration_days,
-        format_type=proposal.terms.format,
+        format_type=proposal.terms.tier,
         message=proposal.message,
         terms_json=json.dumps(proposal.terms.to_dict()),
     )

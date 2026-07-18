@@ -4,8 +4,8 @@ import { NegotiationMessage } from "@/lib/api";
 import { API_BASE } from "@/lib/api";
 
 export interface PendingTerms {
-  ad_space_id?: string;
-  format?: string;
+  package_id?: string;
+  tier?: string;
   duration_days?: number;
   price_per_day?: number;
   start_date?: string;

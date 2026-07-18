@@ -174,8 +174,8 @@ function HumanReviewPanel({
       </div>
 
       <div className="p-5 space-y-2 text-sm">
-        {terms.format && (
-          <div className="flex justify-between"><span className="text-[#64748b]">Format</span><span className="text-[#1e293b]">{terms.format}</span></div>
+        {terms.tier && (
+          <div className="flex justify-between"><span className="text-[#64748b]">Tier</span><span className="text-[#1e293b]">{terms.tier}</span></div>
         )}
         {terms.duration_days && (
           <div className="flex justify-between"><span className="text-[#64748b]">Duration</span><span className="text-[#1e293b]">{terms.duration_days} days</span></div>
@@ -446,7 +446,7 @@ export default function NegotiationDetail() {
                   )}
                   {last.format_type && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-[#64748b]">Format</span>
+                      <span className="text-[#64748b]">Tier</span>
                       <span className="font-semibold text-[#1e293b]">{last.format_type}</span>
                     </div>
                   )}
@@ -510,11 +510,11 @@ export default function NegotiationDetail() {
               </div>
               <p className="text-sm font-semibold text-[#1e293b] mb-3">{neg.contract.listing_title}</p>
               {(() => {
-                let t: { format?: string; duration_days?: number; price_per_day?: number; staff_count?: number; daily_rate_per_person?: number } = {};
+                let t: { tier?: string; duration_days?: number; price_per_day?: number; staff_count?: number; daily_rate_per_person?: number } = {};
                 try { t = JSON.parse(neg.contract.terms_json); } catch { /* ignore */ }
                 return (
                   <div className="space-y-2 text-sm">
-                    {t.format && <div className="flex justify-between"><span className="text-[#64748b]">Format</span><span className="text-[#1e293b]">{t.format}</span></div>}
+                    {t.tier && <div className="flex justify-between"><span className="text-[#64748b]">Tier</span><span className="text-[#1e293b]">{t.tier}</span></div>}
                     {t.duration_days && <div className="flex justify-between"><span className="text-[#64748b]">Duration</span><span className="text-[#1e293b]">{t.duration_days} days</span></div>}
                     {t.price_per_day && <div className="flex justify-between"><span className="text-[#64748b]">Rate</span><span className="text-[#1e293b]">${t.price_per_day}/day</span></div>}
                     {t.staff_count && <div className="flex justify-between"><span className="text-[#64748b]">Staff</span><span className="text-[#1e293b]">{t.staff_count} people</span></div>}

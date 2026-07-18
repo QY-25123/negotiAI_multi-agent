@@ -11,13 +11,9 @@ from typing import Optional
 from pydantic import BaseModel, field_validator, model_validator
 
 
-# ---------------------------------------------------------------------------
-# Shared schema — every proposal must satisfy this regardless of party
-# ---------------------------------------------------------------------------
-
 class ProposalTermsSchema(BaseModel):
-    ad_space_id: str
-    format: str
+    package_id: str
+    tier: str
     duration_days: int
     price_per_day: float
     start_date: str
@@ -46,44 +42,32 @@ class ProposalTermsSchema(BaseModel):
         return v
 
 
-# ---------------------------------------------------------------------------
-# Seller-specific validation
-# ---------------------------------------------------------------------------
-
-def validate_seller_terms(
+def validate_organizer_terms(
     terms_dict: dict,
     absolute_min_price: float,
-    available_formats: Optional[list] = None,
+    available_tiers: Optional[list] = None,
 ) -> tuple[bool, str]:
     """
     Returns (ok, error_message).
-    ok=True means the terms pass all constraints and can be submitted.
-    ok=False means the agent must revise — error_message explains what to fix.
+    Validates a proposal from the Organizer (seller) agent.
     """
-    # 1. Schema validation
     try:
         terms = ProposalTermsSchema(**terms_dict)
     except Exception as exc:
-        return False, (
-            f"SCHEMA VALIDATION FAILED: {exc}. "
-            "Fix the field types and try again."
-        )
+        return False, f"SCHEMA VALIDATION FAILED: {exc}. Fix the field types and try again."
 
     errors = []
 
-    # 2. Hard price floor — seller MUST NOT go below absolute minimum
     if terms.price_per_day < absolute_min_price:
         errors.append(
             f"price_per_day ${terms.price_per_day:.2f} is below your absolute "
-            f"minimum of ${absolute_min_price:.2f}/day. You must NOT go below "
-            "this floor under any circumstances."
+            f"minimum of ${absolute_min_price:.2f}/day. You must NOT go below this floor."
         )
 
-    # 3. Format must be one of the available formats for this space
-    if available_formats and terms.format not in available_formats:
+    if available_tiers and terms.tier not in available_tiers:
         errors.append(
-            f"format '{terms.format}' is not available for this space. "
-            f"Allowed formats: {', '.join(available_formats)}."
+            f"tier '{terms.tier}' is not available for this package. "
+            f"Allowed tiers: {', '.join(available_tiers)}."
         )
 
     if errors:
@@ -92,11 +76,7 @@ def validate_seller_terms(
     return True, ""
 
 
-# ---------------------------------------------------------------------------
-# Buyer-specific validation
-# ---------------------------------------------------------------------------
-
-def validate_buyer_terms(
+def validate_sponsor_terms(
     terms_dict: dict,
     max_budget_per_day: float,
     min_duration_days: int,
@@ -104,27 +84,21 @@ def validate_buyer_terms(
 ) -> tuple[bool, str]:
     """
     Returns (ok, error_message).
+    Validates a proposal from the Sponsor (buyer) agent.
     """
-    # 1. Schema validation
     try:
         terms = ProposalTermsSchema(**terms_dict)
     except Exception as exc:
-        return False, (
-            f"SCHEMA VALIDATION FAILED: {exc}. "
-            "Fix the field types and try again."
-        )
+        return False, f"SCHEMA VALIDATION FAILED: {exc}. Fix the field types and try again."
 
     errors = []
 
-    # 2. Hard budget ceiling — buyer MUST NOT exceed their maximum budget
     if terms.price_per_day > max_budget_per_day:
         errors.append(
             f"price_per_day ${terms.price_per_day:.2f} exceeds your maximum "
-            f"budget of ${max_budget_per_day:.2f}/day. You must NOT exceed this "
-            "budget ceiling under any circumstances."
+            f"budget of ${max_budget_per_day:.2f}/day. You must NOT exceed this ceiling."
         )
 
-    # 3. Duration must be within the buyer's allowed range
     if not (min_duration_days <= terms.duration_days <= max_duration_days):
         errors.append(
             f"duration_days {terms.duration_days} is outside your allowed range "
@@ -135,3 +109,8 @@ def validate_buyer_terms(
         return False, "CONSTRAINT VIOLATION — " + " | ".join(errors)
 
     return True, ""
+
+
+# Keep old names as aliases so any remaining callers don't break immediately
+validate_seller_terms = validate_organizer_terms
+validate_buyer_terms = validate_sponsor_terms

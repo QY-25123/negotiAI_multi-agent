@@ -290,16 +290,15 @@ def _negotiation_summary(negotiation_id: str, round_count: int, completed_at, st
 def _terms_table(terms: dict, total_value: float, service_type: str, styles):
     """Build a terms table from whatever keys exist in the terms dict."""
     LABELS: Dict[str, str] = {
-        "format": "Ad Format",
-        "placement": "Placement",
+        "tier": "Sponsorship Tier",
         "duration_days": "Duration",
         "price_per_day": "Daily Rate",
         "start_date": "Start Date",
+        "special_conditions": "Special Conditions",
         "staff_count": "Staff Count",
         "daily_rate_per_person": "Rate per Person/Day",
         "role": "Role / Position",
         "funding_amount": "Funding Amount",
-        "sponsorship_tier": "Sponsorship Tier",
         "deliverables": "Deliverables",
     }
     FORMATTERS: Dict[str, Any] = {

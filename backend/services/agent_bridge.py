@@ -1,5 +1,5 @@
 """
-agent_bridge.py — Builds AdSpace objects and SellerConfig/BuyerConfig from DB data.
+agent_bridge.py — Builds SponsorshipPackage objects and OrganizerConfig/SponsorConfig from DB data.
 """
 
 import json
@@ -7,8 +7,8 @@ import os
 from typing import Any, Dict, Optional
 
 from fastapi import HTTPException
-from agents import BuyerConfig, SellerConfig
-from models import AdSpace
+from agents import SponsorConfig, OrganizerConfig
+from models import SponsorshipPackage
 
 
 def _require_api_key() -> str:
@@ -16,14 +16,19 @@ def _require_api_key() -> str:
     if not api_key:
         raise HTTPException(
             status_code=503,
-            detail="ANTHROPIC_API_KEY is not configured. Cannot run AI negotiation.",
+            detail="ANTHROPIC_API_KEY is not configured. Cannot run AI deal session.",
         )
     return api_key
 
 
-def build_ad_space_from_listing(listing_id: str, listing_title: str, listing_location: Optional[str], terms_json_str: str) -> AdSpace:
+def build_sponsorship_package_from_listing(
+    listing_id: str,
+    listing_title: str,
+    listing_location: Optional[str],
+    terms_json_str: str,
+) -> SponsorshipPackage:
     """
-    Parse a ServiceListing's terms_json and construct an AdSpace dataclass.
+    Parse a ServiceListing's terms_json and construct a SponsorshipPackage.
     Falls back to sensible defaults for missing fields.
     """
     try:
@@ -31,70 +36,103 @@ def build_ad_space_from_listing(listing_id: str, listing_title: str, listing_loc
     except Exception:
         terms = {}
 
-    available_formats = terms.get("available_formats", ["digital_screen"])
-    min_price_per_day = float(terms.get("min_price_per_day", 20.0))
-    max_duration_days = int(terms.get("max_duration_days", 90))
-    available_from = terms.get("available_from", "2026-04-07")
-    seller_notes = terms.get("notes", "")
+    # Derive available tiers from perks or fall back to a generic package tier
+    perks: list = terms.get("perks", [])
+    available_tiers: list = terms.get("available_tiers", [])
+    if not available_tiers:
+        # Build tiers from the listing title keyword or perks
+        if "title" in listing_title.lower():
+            available_tiers = ["Title Sponsor"]
+        elif "gold" in listing_title.lower():
+            available_tiers = ["Gold Sponsor"]
+        elif "platinum" in listing_title.lower():
+            available_tiers = ["Platinum Sponsor"]
+        elif "silver" in listing_title.lower():
+            available_tiers = ["Silver Sponsor"]
+        else:
+            available_tiers = ["Sponsorship Package"]
 
-    return AdSpace(
+    min_price_per_day = float(terms.get("min_price_per_day", 500.0))
+    max_duration_days = int(terms.get("max_duration_days", terms.get("event_duration_days", 3)))
+    available_from = terms.get("available_from", "2026-09-01")
+    organizer_notes = terms.get("notes", "")
+
+    # Append perks summary to notes so agents can see them
+    if perks and organizer_notes:
+        organizer_notes = f"{organizer_notes} | Included perks: {', '.join(perks)}"
+    elif perks:
+        organizer_notes = f"Included perks: {', '.join(perks)}"
+
+    return SponsorshipPackage(
         id=listing_id,
         name=listing_title,
-        location=listing_location or "Unknown Location",
-        available_formats=available_formats if isinstance(available_formats, list) else [available_formats],
+        location=listing_location or "TBD",
+        available_tiers=available_tiers,
         min_price_per_day=min_price_per_day,
         max_duration_days=max_duration_days,
         available_from=available_from,
-        seller_notes=seller_notes,
+        organizer_notes=organizer_notes,
     )
 
 
-def build_seller_config(seller_name: str, listing_terms_json_str: str, overrides: Optional[Dict[str, Any]] = None) -> SellerConfig:
-    """Build a SellerConfig from a ServiceListing's terms_json."""
+def build_organizer_config(
+    organizer_name: str,
+    listing_terms_json_str: str,
+    overrides: Optional[Dict[str, Any]] = None,
+) -> "OrganizerConfig":
+    """Build an OrganizerConfig from a ServiceListing's terms_json."""
     _require_api_key()
     try:
         terms: Dict[str, Any] = json.loads(listing_terms_json_str or "{}")
     except Exception:
         terms = {}
 
-    absolute_min_price_per_day = float(terms.get("min_price_per_day", 20.0))
-    preferred_min_duration_days = int(terms.get("min_duration_days", 7))
+    absolute_min_price_per_day = float(terms.get("min_price_per_day", 500.0))
+    preferred_min_duration_days = int(
+        terms.get("min_duration_days", terms.get("event_duration_days", 1))
+    )
 
-    # asking_price = max_price_per_day from listing, or None (agent defaults to 120% of min)
     raw_asking = terms.get("max_price_per_day")
     asking_price_per_day = float(raw_asking) if raw_asking is not None else None
 
-    # Human override: allow lowering the seller's floor for a renegotiation
     if overrides and "seller_min_price_override" in overrides:
         absolute_min_price_per_day = float(overrides["seller_min_price_override"])
         asking_price_per_day = None  # reset so it recalculates from new floor
 
-    return SellerConfig(
-        seller_name=seller_name,
+    audience_size = int(terms.get("audience_size", 0))
+
+    return OrganizerConfig(
+        organizer_name=organizer_name,
         absolute_min_price_per_day=absolute_min_price_per_day,
         asking_price_per_day=asking_price_per_day,
         preferred_min_duration_days=preferred_min_duration_days,
-        brand_keywords=["family-friendly", "local", "community"],
+        audience_size=audience_size,
         max_discount_pct=10.0,
     )
 
 
-def build_buyer_config(overrides: Dict[str, Any]) -> BuyerConfig:
-    """Build a BuyerConfig from caller-supplied override dict."""
+def build_sponsor_config(overrides: Dict[str, Any]) -> "SponsorConfig":
+    """Build a SponsorConfig from caller-supplied override dict."""
     _require_api_key()
-    max_budget = float(overrides.get("max_budget_per_unit", 50.0))
+    max_budget = float(overrides.get("max_budget_per_unit", 1000.0))
 
-    # target_price = buyer's desired opening offer; None lets agent default to 70% of max
     raw_target = overrides.get("target_price_per_unit")
     target_price_per_day = float(raw_target) if raw_target is not None else None
 
-    return BuyerConfig(
-        buyer_name=overrides.get("buyer_name", "Buyer Agency"),
-        client_name=overrides.get("client_name", "Client"),
+    return SponsorConfig(
+        sponsor_name=overrides.get("buyer_name", "Sponsor Company"),
+        company_name=overrides.get("client_name", overrides.get("buyer_name", "Sponsor")),
         max_budget_per_day=max_budget,
         target_price_per_day=target_price_per_day,
-        preferred_formats=overrides.get("preferred_formats", ["digital_screen"]),
-        min_duration_days=int(overrides.get("min_duration_days", 14)),
-        max_duration_days=int(overrides.get("preferred_duration_days", 30)),
-        desired_start_date=overrides.get("start_date", "2026-04-07"),
+        preferred_tiers=overrides.get("preferred_formats", ["Sponsorship Package"]),
+        min_duration_days=int(overrides.get("min_duration_days", 1)),
+        max_duration_days=int(overrides.get("preferred_duration_days", 7)),
+        desired_start_date=overrides.get("start_date", "2026-09-01"),
     )
+
+
+# Keep old function names as aliases so negotiation_runner.py import still works
+# until we update the call sites
+build_seller_config = build_organizer_config
+build_buyer_config = build_sponsor_config
+build_ad_space_from_listing = build_sponsorship_package_from_listing
