@@ -1,19 +1,19 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Store, MessageSquare, Building2, Zap, LogOut } from "lucide-react";
+import { LayoutDashboard, Store, MessageSquare, Building2, Zap, LogOut, Settings } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const COMPANIES_LABEL: Record<string, string> = {
-  buyer: "Sellers",
-  seller: "Buyers",
-  both: "Companies",
+  buyer: "Organizers",
+  seller: "Sponsors",
+  both: "Partners",
 };
 
 const ROLE_LABEL: Record<string, string> = {
-  seller: "Seller",
-  buyer: "Buyer",
-  both: "Seller & Buyer",
+  seller: "Organizer",
+  buyer: "Sponsor",
+  both: "Sponsor & Organizer",
 };
 
 export function Sidebar() {
@@ -31,6 +31,7 @@ export function Sidebar() {
     { href: "/marketplace", label: "Marketplace", icon: Store },
     { href: "/negotiations", label: "Deals", icon: MessageSquare },
     { href: "/companies", label: COMPANIES_LABEL[company?.type ?? "both"] ?? "Companies", icon: Building2 },
+    { href: "/settings", label: "Settings", icon: Settings },
   ];
 
   return (
