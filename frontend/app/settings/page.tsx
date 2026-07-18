@@ -6,9 +6,9 @@ import { api } from "@/lib/api";
 import { Save, Loader2, CheckCircle2 } from "lucide-react";
 
 const ROLE_OPTIONS = [
-  { value: "buyer",  label: "Sponsor — we fund events" },
-  { value: "seller", label: "Organizer — we host events" },
-  { value: "both",   label: "Both" },
+  { value: "sponsor",   label: "Sponsor — we fund events" },
+  { value: "organizer", label: "Organizer — we host events" },
+  { value: "both",      label: "Both" },
 ];
 
 const COLOR_OPTIONS = [
@@ -28,7 +28,7 @@ export default function SettingsPage() {
 
   const [form, setForm] = useState({
     name: "",
-    type: "buyer",
+    type: "sponsor",
     industry: "",
     description: "",
     website: "",

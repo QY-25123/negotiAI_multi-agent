@@ -22,6 +22,8 @@ from services.agent_bridge import (  # noqa: E402
     build_sponsorship_package_from_listing,
     build_sponsor_config,
     build_organizer_config,
+    build_organizer_config_from_overrides,
+    build_sponsor_config_from_listing,
 )
 
 _executor = ThreadPoolExecutor(max_workers=4)
@@ -138,8 +140,20 @@ async def run_negotiation(
                 except Exception:
                     pass
 
-            organizer_config = build_organizer_config(seller_company.name, listing.terms_json, override_constraints)
-            sponsor_config = build_sponsor_config(buyer_config_overrides)
+            if buyer_config_overrides.get("reverse_roles"):
+                # Organizer initiated against a sponsor's listing.
+                # seller_company is the organizer; buyer_company is the sponsor.
+                organizer_config = build_organizer_config_from_overrides(
+                    seller_company.name, buyer_config_overrides
+                )
+                sponsor_config = build_sponsor_config_from_listing(
+                    buyer_company.name, listing.terms_json
+                )
+            else:
+                organizer_config = build_organizer_config(
+                    seller_company.name, listing.terms_json, override_constraints
+                )
+                sponsor_config = build_sponsor_config(buyer_config_overrides)
         except Exception as exc:
             await push(negotiation_id, {"type": "error", "detail": str(exc)})
             neg.status = "failed"

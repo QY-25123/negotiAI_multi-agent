@@ -34,3 +34,6 @@ backend/data/
 # Postman (auto-managed, not source-controlled)
 .postman/
 postman/
+
+# Seed data (contains demo credentials)
+seed.sql

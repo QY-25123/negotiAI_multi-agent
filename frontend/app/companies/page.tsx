@@ -6,33 +6,33 @@ import { CompanyAvatar } from "@/components/ui/CompanyAvatar";
 import { useAuth } from "@/context/AuthContext";
 
 const TYPE_COLORS: Record<string, { label: string; color: string; bg: string }> = {
-  seller: { label: "Organizer", color: "#3b82f6", bg: "rgba(59,130,246,0.12)" },
-  buyer: { label: "Sponsor", color: "#10b981", bg: "rgba(16,185,129,0.12)" },
-  both: { label: "Both", color: "#a855f7", bg: "rgba(168,85,247,0.12)" },
+  organizer: { label: "Organizer", color: "#3b82f6", bg: "rgba(59,130,246,0.12)" },
+  sponsor:   { label: "Sponsor",   color: "#10b981", bg: "rgba(16,185,129,0.12)" },
+  both:      { label: "Both",      color: "#a855f7", bg: "rgba(168,85,247,0.12)" },
 };
 
 function getOppositeTypes(myType: string): string[] {
-  if (myType === "buyer") return ["seller", "both"];
-  if (myType === "seller") return ["buyer", "both"];
-  return ["seller", "buyer", "both"];
+  if (myType === "sponsor") return ["organizer", "both"];
+  if (myType === "organizer") return ["sponsor", "both"];
+  return ["organizer", "sponsor", "both"];
 }
 
 export default function Companies() {
   const { company: myCompany } = useAuth();
   const { data: companies, isLoading } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
 
-  const visibleTypes = myCompany ? getOppositeTypes(myCompany.type) : ["seller", "buyer", "both"];
+  const visibleTypes = myCompany ? getOppositeTypes(myCompany.type) : ["organizer", "sponsor", "both"];
   const filtered = (companies || []).filter(co => visibleTypes.includes(co.type));
 
-  const title = myCompany?.type === "buyer"
+  const title = myCompany?.type === "sponsor"
     ? "Organizers"
-    : myCompany?.type === "seller"
+    : myCompany?.type === "organizer"
     ? "Sponsors"
     : "Partners";
 
-  const subtitle = myCompany?.type === "buyer"
+  const subtitle = myCompany?.type === "sponsor"
     ? "Event organizers looking for sponsorship"
-    : myCompany?.type === "seller"
+    : myCompany?.type === "organizer"
     ? "Companies looking to sponsor events"
     : "All registered event marketplace participants";
 
