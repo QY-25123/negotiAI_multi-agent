@@ -174,7 +174,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
 
 @router.post("/demo", response_model=AuthResponse)
 def demo_login(db: Session = Depends(get_db)):
-    demo_email = "demo@negotiai.com"
+    demo_email = "demo@agora.com"
     user = db.query(User).filter(User.email == demo_email).first()
 
     if user:
@@ -184,7 +184,7 @@ def demo_login(db: Session = Depends(get_db)):
             name="Demo Visitor",
             type="sponsor",
             industry="Technology",
-            description="Demo account — exploring AI-powered B2B negotiation",
+            description="Demo account — exploring the Agora event sponsorship marketplace.",
             avatar_color="#3b82f6",
             logo_initials="DV",
             contact_email=demo_email,
