@@ -90,7 +90,11 @@ function MessageBubble({ msg, sellerName, buyerName, sellerColor, buyerColor }: 
               </div>
             )}
           </div>
-          <p className="text-[10px] text-[#64748b] mt-1 px-1">{timeAgo(msg.created_at)}</p>
+          <p className="text-[10px] text-[#64748b] mt-1 px-1">
+            {msg.created_at
+              ? new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              : ""}
+          </p>
         </div>
       </div>
     </div>

@@ -383,6 +383,7 @@ async def _flush_new_proposals(
                         "price_per_unit": proposal.terms.price_per_day,
                         "duration_days": proposal.terms.duration_days,
                         "terms_json": proposal.terms.to_dict(),
+                        "created_at": datetime.utcnow().isoformat() + "Z",
                     },
                 )
 
@@ -429,6 +430,7 @@ async def _flush_new_proposals(
                             "price_per_unit": proposal.terms.price_per_day,
                             "duration_days": proposal.terms.duration_days,
                             "terms_json": proposal.terms.to_dict(),
+                            "created_at": datetime.utcnow().isoformat() + "Z",
                         },
                     )
 
@@ -466,4 +468,5 @@ def _make_sse_event(proposal, round_number: int, action: str) -> Dict[str, Any]:
         "price_per_unit": proposal.terms.price_per_day,
         "duration_days": proposal.terms.duration_days,
         "terms_json": proposal.terms.to_dict(),
+        "created_at": datetime.utcnow().isoformat() + "Z",
     }
