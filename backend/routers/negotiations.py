@@ -243,6 +243,8 @@ def get_negotiation(negotiation_id: str, db: Session = Depends(get_db)):
             for m in neg.messages
         ],
         contract=contract_resp,
+        pending_terms_json=neg.pending_terms_json,
+        buyer_config_json=neg.buyer_config_json,
     )
 
 
